@@ -1,50 +1,50 @@
-# ART — 원의 도시
+# 원의 도시 · CITY OF CIRCLES
 
-전시장 관람객이 QR코드를 스캔하여 직접 촬영한 멘홀 사진과 발견 장소를 등록하는 참여형 아카이브.
+전시 QR을 통해 멘홀 사진과 발견 장소를 등록하는 PHP/MySQL MVP.
 
-## 현재 상태
+**목표 주소:** `https://hwadongmi.soulmagics.net/circle/`
 
-개발 계획만 등록된 초기 저장소입니다. 실행 가능한 앱, 데이터베이스, 서버 배포는 아직 없습니다.
+## 제공 기능
 
-## 배포 목표
+- HOME / ARCHIVE / MAP / UPLOAD / ADMIN / LIVE
+- EXIF GPS, 현재 위치, 지도 핀 및 좌표 입력
+- Kakao JavaScript 키 설정 시 장소 검색
+- 서버 이미지 검사, JPEG 재인코딩 및 썸네일 (공개 EXIF 제거)
+- 관리자 비밀번호 로그인, 승인·거절·숨김
+- 승인 사진만 공개, 정확 좌표는 API에서 제외 (공개 좌표 소수점 3자리 반올림)
+- LIVE 약 3초 간격 조회, 실패 시 마지막 화면 유지 및 재시도
+- CSRF, 경로 전용 세션 쿠키, IP별 요청 제한, 중복 요청 키
 
-- 주소: https://hwadongmi.soulmagics.net/circle/
-- Hostinger Business 웹호스팅에 독립 PHP 앱 배포
-- 별도 MySQL 데이터베이스와 사진 저장 공간 사용
-- 화동미전 홈페이지와 메뉴, 관리자 및 데이터 분리
-- Lovable, Vercel, Supabase는 필수 의존성에서 제외
-- 실제 설치 전 기존 사이트 유형, PHP 확장, MySQL 및 문서 루트 확인 필요
+## 설치
 
-## MVP
+[Hostinger 설치 및 충돌 방지 가이드](docs/HOSTINGER_INSTALL.md)
 
-1. HOME / ARCHIVE: 승인된 사진만 공개
-2. UPLOAD: 사진 선택 → EXIF 위치 추출 → 현재 위치 또는 지도 보정 → 위치 확인 → 제출
-3. MAP: 승인 사진의 공개 좌표 표시, 사진과 지도 상호 탐색
-4. ADMIN: 로그인, 대기 사진 확인, 승인/거절/숨김
-5. LIVE: 승인 항목을 약 3초 간격으로 조회하여 전시장 표시
+PHP 8.2+, MySQL 8 또는 호환 MariaDB, GD, PDO MySQL, fileinfo, HTTPS가 필요합니다.
+`circle/`만 사이트 문서 루트 아래에, `private-circle/`은 문서 루트의 상위 폴더에 설치합니다.
+기존 홈페이지 파일, 루트 .htaccess, DNS, 기존 DB를 변경하지 않습니다.
 
-## 구현 원칙
+## 실행 상태
 
-- PHP 서버 API와 PDO prepared statements로 MySQL 접근
-- 서버에서 파일 형식과 크기를 검사하고 이미지 재인코딩 및 썸네일 생성
-- 공개 이미지의 EXIF 제거, 정확한 좌표와 공개 좌표 분리
-- 미승인 이미지 원본은 웹에서 직접 접근할 수 없는 위치에 보관
-- 관리자 세션, CSRF 방어, 업로드 횟수 제한 및 공개 동의
-- 서버 응답 확인 후에만 업로드 완료 표시
-- DB 비밀번호 및 운영 설정은 웹 문서 루트 밖에 저장하고 Git에 커밋하지 않음
-- /circle/ 기본 경로에 맞춰 자산 경로와 라우팅 구성
-- iPhone Safari 사진/HEIC 처리, 위치 권한 거절, 업로드 재시도 검증
-- 전시장 동시 접속 및 LIVE 반영 시간은 실제 호스팅에서 측정
+이 저장소는 코드와 설치 패키지를 제공합니다. GitHub에 저장됐다고 서버에 배포된 것은 아닙니다.
+Hostinger 실제 설정 및 전시장 기기 검증이 완료돼야 운영 준비 완료로 판단합니다.
 
-## 예정 구조
+## 검사
 
-```text
-circle/             배포할 공개 파일과 프론트엔드
-server/             웹 문서 루트 밖의 PHP 설정과 서버 코드
- database/          MySQL 초기 스키마 (구현 시 database/ 경로 사용)
-docs/               설치 및 운영 가이드
+```sh
+node --check circle/assets/app.js
+php -d zend.assertions=1 -d assert.exception=1 tests/validation.php
+python3 tools/package.py
 ```
 
-## 설치 전 확인
+GitHub Actions는 PHP 구문, 입력 검증 및 MySQL 업로드/검수/접근 제어 통합 검사를 수행합니다.
+테스트에는 실제 운영 비밀정보를 사용하지 않습니다.
 
-Hostinger hPanel에서 화동미전 사이트의 제작 방식(PHP/HTML, WordPress, Website Builder 등), 파일 관리자, MySQL 메뉴와 실제 문서 루트를 확인합니다. Website Builder에서 운영 중인 경우 동일 도메인의 /circle 경로 설치 가능 여부를 별도로 검토합니다.
+## MVP 제한
+
+- HEIC는 브라우저가 읽을 수 있으면 JPEG로 변환, 읽지 못하면 JPEG 선택 안내
+- LIVE는 WebSocket이 아닌 polling이며 5초 반영 보장은 실서버 측정 필요
+- 지도는 Leaflet + OpenStreetMap 타일; 외부 네트워크 필요, 대규모 운영은 전용 타일 공급자 검토
+- 지도 영역당 최대 200개 표시 (클러스터링·세계지도·배지·회원 기능은 후속 범위)
+- 장소 검색은 Kakao 키와 사이트 등록 필요; 키 없이는 지도 핀/좌표 입력 사용
+- CAPTCHA와 이미지 자동 검수는 미포함; 공개 전 관리자 승인 필수
+- 삭제 요청은 @cloud.visualizer로 접수 후 운영자가 서버 파일과 DB에서 처리

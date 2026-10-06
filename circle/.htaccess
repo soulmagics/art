@@ -1,0 +1,7 @@
+Options -Indexes
+DirectoryIndex index.php
+RewriteEngine On
+RewriteRule ^(?:upload|archive|map|live|admin)/?$ index.php [L]
+<FilesMatch "^\.">
+Require all denied
+</FilesMatch>

@@ -1,0 +1,28 @@
+name: Circle checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test-only
+          MYSQL_DATABASE: circle_test
+        ports: ['3306:3306']
+        options: --health-cmd="mysqladmin ping -ptest-only" --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - name: PHP syntax and input validation
+        run: |
+          find circle private-circle tools tests -name '*.php' -print0 | xargs -0 -n1 php -l
+          php -d zend.assertions=1 -d assert.exception=1 tests/validation.php
+      - name: JavaScript syntax
+        run: node --check circle/assets/app.js
+      - name: MySQL integration
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y php-mysql php-gd
+          php tests/integration.php
