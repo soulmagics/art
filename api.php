@@ -132,6 +132,10 @@ try {
   admin();limit('collection-update',60);$input=jsonInput();$slug=$input['slug']??'';
   if(!is_string($slug)||!array_key_exists($slug,collectionDefaults())||!is_file(__DIR__.'/assets/editorial/'.$slug.'.jpg'))throw new InvalidArgumentException('작가의 수집 사진을 확인해 주세요.');
   $title=textField($input,'title',120,true);$description=textField($input,'description',500);
+  if(!array_key_exists('location_confirmed',$input)&&!array_key_exists('location_label',$input)&&!array_key_exists('draft_lat',$input)&&!array_key_exists('draft_lng',$input)&&!array_key_exists('lat',$input)&&!array_key_exists('lng',$input)){
+   $s=db()->prepare('INSERT INTO circle_collection(slug,title,description) VALUES (?,?,?) ON DUPLICATE KEY UPDATE title=VALUES(title),description=VALUES(description)');
+   $s->execute([$slug,$title,$description]);out(['ok'=>true,'slug'=>$slug,'title'=>$title,'description'=>$description]);
+  }
   $location=textField($input,'location_label',150);$confirmed=($input['location_confirmed']??'')==='yes';
   $lat=null;$lng=null;
   if($confirmed){
