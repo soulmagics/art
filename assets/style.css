@@ -141,6 +141,15 @@ h3{font-size:30px;letter-spacing:-.8px;line-height:1.45}
 .archive-heading{position:relative;isolation:isolate}
 .archive-heading::before,.archive-heading::after{content:"";position:absolute;z-index:-1;width:132px;height:132px;border:1px solid var(--line);border-radius:50%;right:20px;top:12px}
 .archive-heading::after{right:0;top:38px;border-color:#b8c5b7;background:rgba(224,229,217,.27)}
+.curated-section{padding:0 0 68px;border-bottom:1px solid var(--line)}
+.curated-section h2 small{font:500 14px var(--font-body);color:var(--muted);vertical-align:middle}
+.curated-intro{max-width:340px;color:var(--muted);font-size:12px;line-height:1.7}
+.curated-grid .photo-mat{aspect-ratio:4/5}
+.curated-grid img{height:100%;object-fit:cover}
+.community-section{padding-top:64px}
+.community-heading{margin-bottom:28px}
+.community-heading h2{font-size:32px;margin:0 0 10px}
+.community-heading p:last-child{color:var(--muted);font-size:13px;margin:0}
 .archive-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;border-block:1px solid var(--line);padding:22px 0;min-width:0}
 .filter-tabs{display:flex;gap:8px;flex-wrap:wrap}
 .filter-tabs button{padding:10px 20px;font-size:13px}

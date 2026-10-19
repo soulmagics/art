@@ -1,5 +1,5 @@
 'use strict';
-const {base,kakaoKey,editorial=[]}=window.CIRCLE_CONFIG;
+const {base,kakaoKey,editorial=[],collection=[]}=window.CIRCLE_CONFIG;
 const app=document.querySelector('#app');
 const $=id=>document.getElementById(id);
 let uploadKey=crypto.randomUUID().replaceAll('-',''),csrf='',isAdmin=false,posts=[],page=1;
@@ -42,6 +42,15 @@ function detail(p){
   (isPhoto(p)?'<a class="button" href="'+base+'/map/?lat='+encodeURIComponent(p.public_lat)+'&lng='+encodeURIComponent(p.public_lng)+'">지도에서 보기</a>':'');
  document.body.append(dialog);dialog.setAttribute('aria-label',isPhoto(p)?p.location_label:'도시에 남긴 이야기');dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
 }
+function collectionMarkup(){
+ if(!collection.length)return '';
+ return '<section class="curated-section" aria-labelledby="curated-title"><div class="controls"><div><p class="eyebrow">THE ARTIST’S COLLECTION</p><h2 id="curated-title">작가의 수집 <small>'+collection.length+'장</small></h2></div><p class="curated-intro">촬영 장소를 확인하지 않은 전시 사진입니다. 관람객 기록·지도와는 별도로 보여드려요.</p></div><div class="grid curated-grid">'+collection.map((item,i)=>'<article class="card curated-card"><button class="card-open secondary" type="button" data-curated="'+i+'" aria-label="'+esc(item.title)+' 사진 크게 보기"><span class="photo-mat"><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진" loading="lazy"><span class="photo-tag">작가의 수집</span></span></button><p><strong>'+esc(item.title)+'</strong><br><span class="muted">장소 미확인 · 지도 표시 없음</span></p></article>').join('')+'</div></section>';
+}
+function wireCollection(){app.querySelectorAll('[data-curated]').forEach(button=>button.onclick=()=>{
+ const item=collection[Number(button.dataset.curated)];if(!item)return;
+ const dialog=document.createElement('dialog');dialog.innerHTML='<button class="secondary" data-close>닫기</button><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진"><h2>'+esc(item.title)+'</h2><p class="muted">작가의 수집 · 촬영 장소 미확인 · 지도 표시 없음</p>';
+ document.body.append(dialog);dialog.setAttribute('aria-label',item.title+' 사진');dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
+ });}
 function pagination(total,current){return '<div class="row pagination"><button id="previous" class="secondary" '+(current===1?'disabled':'')+'>← 이전</button><span>'+current+' / '+Math.max(1,Math.ceil(total/60))+' 페이지</span><button id="next" class="secondary" '+(current*60>=total?'disabled':'')+'>다음 →</button></div>';}
 function missionMarkup(){
  const m=missions[missionIndex];
@@ -63,7 +72,8 @@ function homeMarkup(data){
 function archiveMarkup(data){
  const typeButtons=[['all','모든 기록'],['photo','사진'],['text','이야기']].map(([type,label])=>'<button type="button" class="secondary" data-type="'+type+'" aria-pressed="'+(filters.type===type)+'">'+label+'</button>').join('');
  const topicButtons=[['','모든 사진'],...Object.entries(patterns)].map(([pattern,label])=>'<button type="button" class="topic-pill" data-pattern="'+pattern+'" aria-pressed="'+(filters.type==='photo'&&filters.pattern===pattern)+'"><span class="topic-dot" aria-hidden="true"></span>'+label+'</button>').join('');
- return '<div class="page-heading archive-heading"><p class="eyebrow">THE CITY, COLLECTED</p><h1>도시의 원 아카이브<span class="heading-dot">.</span></h1><p>서로 다른 길에서 발견한 사진과 이야기. 당신의 시선으로 둘러보세요.</p></div><form id="archive-search" class="archive-tools"><div class="filter-tabs" aria-label="기록 유형">'+typeButtons+'</div><div class="search-row"><label class="sr-only" for="archive-q">장소·이름·이야기 검색</label><input id="archive-q" type="search" maxlength="80" value="'+esc(filters.q)+'" placeholder="장소, 이름, 이야기를 찾아보세요"><button type="submit" class="secondary">검색 ↗</button></div><div class="topic-explorer"><p>무늬를 따라 발견하기 <span>사진의 무늬를 골라 둘러보세요</span></p><div class="topic-list" role="group" aria-label="사진 무늬로 탐색">'+topicButtons+'</div></div></form><div class="controls result-info"><p role="status">'+data.total+'개의 기록'+(filters.q?' · “'+esc(filters.q)+'”':'')+'</p><button class="text-link" id="surprise" '+(posts.length?'':'disabled')+'>↝ 이 페이지에서 우연히 하나</button></div><section class="grid archive-grid" aria-label="공개 기록">'+(posts.length?cards(posts):'<div class="empty"><span aria-hidden="true">◎</span><h2>아직 이곳은 비어 있어요.</h2><p>다른 조건으로 찾아보거나, 첫 발견을 남겨주세요.</p><a class="button secondary" href="'+base+'/archive/">검색 초기화</a> <a class="button" href="'+base+'/upload/">나의 발견 남기기 ↗</a></div>')+'</section>'+pagination(data.total,page);
+ const showCollection=filters.type==='all'&&!filters.pattern&&!filters.q&&page===1;
+ return '<div class="page-heading archive-heading"><p class="eyebrow">THE CITY, COLLECTED</p><h1>도시의 원 아카이브<span class="heading-dot">.</span></h1><p>서로 다른 길에서 발견한 사진과 이야기. 당신의 시선으로 둘러보세요.</p></div>'+(showCollection?collectionMarkup():'')+'<section class="community-section" aria-label="관람객 기록"><div class="community-heading"><p class="eyebrow">THE COLLECTIVE FIELD NOTES</p><h2>함께 쌓이는 기록</h2><p>관리자 확인을 마친 관람객 기록만 표시합니다. 사진은 위치가 확인된 경우에만 지도에 표시됩니다.</p></div><form id="archive-search" class="archive-tools"><div class="filter-tabs" aria-label="기록 유형">'+typeButtons+'</div><div class="search-row"><label class="sr-only" for="archive-q">장소·이름·이야기 검색</label><input id="archive-q" type="search" maxlength="80" value="'+esc(filters.q)+'" placeholder="장소, 이름, 이야기를 찾아보세요"><button type="submit" class="secondary">검색 ↗</button></div><div class="topic-explorer"><p>무늬를 따라 발견하기 <span>사진의 무늬를 골라 둘러보세요</span></p><div class="topic-list" role="group" aria-label="사진 무늬로 탐색">'+topicButtons+'</div></div></form><div class="controls result-info"><p role="status">'+data.total+'개의 관람객 기록'+(filters.q?' · “'+esc(filters.q)+'”':'')+'</p><button class="text-link" id="surprise" '+(posts.length?'':'disabled')+'>↝ 이 페이지에서 우연히 하나</button></div><section class="grid archive-grid" aria-label="공개 기록">'+(posts.length?cards(posts):'<div class="empty"><span aria-hidden="true">◎</span><h2>관람객 기록을 기다리고 있어요.</h2><p>첫 발견을 남겨 주세요. 관리자 확인 후 이곳에 공개됩니다.</p><a class="button" href="'+base+'/upload/">나의 발견 남기기 ↗</a></div>')+'</section>'+pagination(data.total,page)+'</section>';
 }
 function mountArchiveGrid(grid){
  if(!grid||!window.ResizeObserver)return ()=>{};
@@ -91,7 +101,7 @@ async function archive(home=false){
  const data=await api('list&'+query);if(revision!==archiveRevision)return;destroyBento();destroyArchiveGrid();posts=data.posts;app.innerHTML=home?homeMarkup(data):archiveMarkup(data);
  if(home)destroyBento=window.CIRCLE_BENTO?.mount(app.querySelector('[data-bento]'))||(()=>{});
  else destroyArchiveGrid=mountArchiveGrid(app.querySelector('.archive-grid'));
- wireDetails();wireMission();$('surprise').onclick=()=>{if(posts.length)detail(posts[Math.floor(Math.random()*posts.length)]);};
+ wireDetails();wireCollection();wireMission();$('surprise').onclick=()=>{if(posts.length)detail(posts[Math.floor(Math.random()*posts.length)]);};
  if(!home){
   const apply=()=>{const query=new URLSearchParams({...filters,page});history.replaceState(null,'',base+'/archive/?'+query);archive().then(()=>app.focus({preventScroll:true})).catch(error);};
   $('archive-search').onsubmit=e=>{e.preventDefault();filters.q=$('archive-q').value.trim();page=1;apply();};

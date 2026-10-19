@@ -6,6 +6,20 @@ $editorialNames=['bento-center','bento-letter','bento-rhythm','bento-yellow','be
 // A partial new set falls back as a whole, preserving tile order and alt text.
 foreach($editorialNames as $name)if(!is_file(__DIR__.'/assets/editorial/'.$name.'.jpg')){$editorialNames=['letter','rhythm','garden'];break;}
 foreach($editorialNames as $name)if(is_file(__DIR__.'/assets/editorial/'.$name.'.jpg'))$editorial[]=$cfg['base_path'].'/assets/editorial/'.$name.'.jpg';
+$collection=[];
+$collectionNames=[
+ 'collection-arrow'=>'붉은 화살표와 동심원',
+ 'collection-tiger'=>'호랑이의 선',
+ 'collection-triangle'=>'삼각형이 모인 원',
+ 'collection-red'=>'붉은 자갈 무늬',
+ 'collection-maze'=>'작은 미로',
+ 'collection-grid'=>'검은 격자와 꽃',
+ 'collection-double'=>'두 겹의 무늬',
+ 'collection-rings'=>'겹겹의 원',
+ 'collection-sun'=>'햇살 같은 무늬',
+ 'collection-dots'=>'점으로 채운 원',
+];
+foreach($collectionNames as $name=>$title)if(is_file(__DIR__.'/assets/editorial/'.$name.'.jpg'))$collection[]=['src'=>$cfg['base_path'].'/assets/editorial/'.$name.'.jpg','title'=>$title];
 header('Cache-Control: no-store');
 ?>
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>원의 도시 · CITY OF CIRCLES</title><link rel="icon" type="image/svg+xml" href="<?= $base ?>/assets/manhole-mark.svg"><link rel="stylesheet" href="<?= $base ?>/assets/style.css"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></head><body>
@@ -14,6 +28,6 @@ header('Cache-Control: no-store');
 <header><a href="<?= $base ?>/" class="brand"><img class="brand-mark" src="<?= $base ?>/assets/manhole-mark.svg" width="42" height="42" alt=""><span class="brand-type"><span class="brand-name">원의 도시</span><small>CITY OF CIRCLES</small></span></a><a href="https://www.instagram.com/cloud.visualizer/" target="_blank" rel="noopener">A PROJECT BY<br>@cloud.visualizer ↗</a></header>
 <main id="app" tabindex="-1"><p class="loading" role="status">도시의 원을 불러오고 있어요…</p></main><div id="notice" role="status"></div>
 <nav aria-label="주요 메뉴"><a href="<?= $base ?>/" data-route="home"><img class="nav-mark" src="<?= $base ?>/assets/manhole-mark.svg" width="20" height="20" alt="">발견</a><a href="<?= $base ?>/archive/" data-route="archive"><span aria-hidden="true">▦</span>아카이브</a><a href="<?= $base ?>/upload/" data-route="upload" class="add"><span aria-hidden="true">＋</span>참여하기</a><a href="<?= $base ?>/map/" data-route="map"><span aria-hidden="true">⌖</span>지도</a><a href="<?= $base ?>/live/" data-route="live"><span aria-hidden="true">◉</span>LIVE</a></nav>
-<script>window.CIRCLE_CONFIG=<?= json_encode(['base'=>$cfg['base_path'],'kakaoKey'=>$cfg['kakao_js_key'],'editorial'=>$editorial],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;</script>
+<script>window.CIRCLE_CONFIG=<?= json_encode(['base'=>$cfg['base_path'],'kakaoKey'=>$cfg['kakao_js_key'],'editorial'=>$editorial,'collection'=>$collection],JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?>;</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/lite.umd.js"></script><script src="<?= $base ?>/assets/discovery.js" defer></script><script src="<?= $base ?>/assets/bento.js" defer></script><script src="<?= $base ?>/assets/app.js" defer></script>
 </body></html>
