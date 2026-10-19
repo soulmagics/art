@@ -4,6 +4,7 @@ require __DIR__.'/bootstrap.php';
 require __DIR__.'/validation.php';
 require __DIR__.'/images.php';
 require __DIR__.'/google-auth.php';
+require __DIR__.'/collection.php';
 function jsonInput(): array {
  $input=json_decode(file_get_contents('php://input'),true);
  if(!is_array($input))throw new InvalidArgumentException('요청 내용을 확인해 주세요.');
@@ -106,6 +107,32 @@ try {
    else{$s=$pdo->prepare('UPDATE circle_posts SET status=? WHERE id=?');$s->execute([$status,$id]);}
   }
   $pdo->commit();out(['ok'=>true]);
+ }
+ if($action==='edit') {
+  limit('edit',60);$input=jsonInput();$id=$input['id']??'';
+  if(!is_string($id)||!preg_match('/^[a-f0-9]{32}$/',$id))throw new InvalidArgumentException('기록을 확인해 주세요.');
+  if(empty($_SESSION['admin'])||($_SESSION['admin_until']??0)<=time()){
+   if(empty($_SESSION['user_id'])||($_SESSION['user_until']??0)<=time())out(['error'=>'로그인이 필요합니다.'],401);
+  }
+  if(($input['consent']??'')!=='yes')throw new InvalidArgumentException('수정한 내용의 공개 동의가 필요합니다.');
+  $nickname=textField($input,'nickname',60)?:'도시 관찰자';$caption=textField($input,'caption',500);
+  $pdo=db();$pdo->beginTransaction();
+  try{
+   $s=$pdo->prepare('SELECT post_type,user_id,nickname,caption,status FROM circle_posts WHERE id=? FOR UPDATE');$s->execute([$id]);$row=$s->fetch();
+   $isAdmin=!empty($_SESSION['admin'])&&($_SESSION['admin_until']??0)>time();
+   if(!$row||(!$isAdmin&&($row['user_id']===null||$row['user_id']!==($_SESSION['user_id']??null)))){$pdo->rollBack();out(['error'=>'기록을 찾을 수 없습니다.'],404);}
+   if($row['post_type']==='text'&&$caption===''){$pdo->rollBack();throw new InvalidArgumentException('글 내용을 입력해 주세요.');}
+   $changed=$row['nickname']!==$nickname||$row['caption']!==$caption;
+   if($changed){$s=$pdo->prepare('UPDATE circle_posts SET nickname=?,caption=?,status=?,approved_at=NULL WHERE id=?');$s->execute([$nickname,$caption,'pending',$id]);}
+   $pdo->commit();out(['ok'=>true,'changed'=>$changed,'status'=>$changed?'pending':$row['status']]);
+  }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
+ }
+ if($action==='collection-update') {
+  admin();limit('collection-update',60);$input=jsonInput();$slug=$input['slug']??'';
+  if(!is_string($slug)||!array_key_exists($slug,collectionDefaults())||!is_file(__DIR__.'/assets/editorial/'.$slug.'.jpg'))throw new InvalidArgumentException('작가의 수집 사진을 확인해 주세요.');
+  $title=textField($input,'title',120,true);$description=textField($input,'description',500);
+  $s=db()->prepare('INSERT INTO circle_collection(slug,title,description) VALUES (?,?,?) ON DUPLICATE KEY UPDATE title=VALUES(title),description=VALUES(description)');$s->execute([$slug,$title,$description]);
+  out(['ok'=>true,'slug'=>$slug,'title'=>$title,'description'=>$description]);
  }
  if($action==='upload') {
   $data=validateUpload($_POST);

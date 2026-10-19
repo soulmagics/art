@@ -1,26 +1,14 @@
 <?php
 require __DIR__.'/bootstrap.php';
 require __DIR__.'/google-auth.php';
+require __DIR__.'/collection.php';
 $base=htmlspecialchars($cfg['base_path'],ENT_QUOTES,'UTF-8');
 $editorial=[];
 $editorialNames=['bento-center','bento-letter','bento-rhythm','bento-yellow','bento-orange'];
 // A partial new set falls back as a whole, preserving tile order and alt text.
 foreach($editorialNames as $name)if(!is_file(__DIR__.'/assets/editorial/'.$name.'.jpg')){$editorialNames=['letter','rhythm','garden'];break;}
 foreach($editorialNames as $name)if(is_file(__DIR__.'/assets/editorial/'.$name.'.jpg'))$editorial[]=$cfg['base_path'].'/assets/editorial/'.$name.'.jpg';
-$collection=[];
-$collectionNames=[
- 'collection-arrow'=>'붉은 화살표와 동심원',
- 'collection-tiger'=>'호랑이의 선',
- 'collection-triangle'=>'삼각형이 모인 원',
- 'collection-red'=>'붉은 자갈 무늬',
- 'collection-maze'=>'작은 미로',
- 'collection-grid'=>'검은 격자와 꽃',
- 'collection-double'=>'두 겹의 무늬',
- 'collection-rings'=>'겹겹의 원',
- 'collection-sun'=>'햇살 같은 무늬',
- 'collection-dots'=>'점으로 채운 원',
-];
-foreach($collectionNames as $name=>$title)if(is_file(__DIR__.'/assets/editorial/'.$name.'.jpg'))$collection[]=['src'=>$cfg['base_path'].'/assets/editorial/'.$name.'.jpg','title'=>$title];
+$collection=collectionItems($cfg['base_path']);
 header('Cache-Control: no-store');
 ?>
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#ffffff"><title>원의 도시 · CITY OF CIRCLES</title><link rel="icon" type="image/svg+xml" href="<?= $base ?>/assets/manhole-mark.svg"><link rel="stylesheet" href="<?= $base ?>/assets/style.css"><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"></head><body>

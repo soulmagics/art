@@ -238,6 +238,16 @@ dialog::backdrop{background:#141811b3}
 dialog>button{float:right;margin-bottom:20px}
 dialog img{display:block;width:100%;max-height:50vh;object-fit:contain;border-radius:var(--radius-input);clear:both}
 dialog h2{clear:both;margin-top:20px}
+.edit-form{display:grid;gap:10px;clear:both}
+.edit-form h2{margin:0 0 4px}
+.edit-form textarea{min-height:130px}
+.edit-form .row{justify-content:flex-end;margin-top:8px}
+.edit-error{color:#a0392d;min-height:1em}
+.account-record>button{margin:0 0 16px 16px}
+.curated-description{display:inline-block;margin:5px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.admin-collection{margin-top:64px;padding-top:32px;border-top:1px solid var(--line)}
+.admin-collection .card>img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover}
+.admin-collection .card>button{margin:0 16px 16px}
 .live-mode nav{display:none}
 .live-mode main{max-width:1600px;padding-bottom:40px}
 .live-mode .grid{grid-template-columns:repeat(6,minmax(0,1fr))}
