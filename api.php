@@ -39,6 +39,7 @@ try {
    $count=db()->prepare('SELECT COUNT(*) FROM circle_posts WHERE status=?');$count->execute([$status]);
    out(['posts'=>$s->fetchAll(),'total'=>(int)$count->fetchColumn(),'page'=>$page]);
   }
+  if ($action==='collection-manage') {admin();out(['items'=>collectionItems($cfg['base_path'],true)]);}
   if ($action==='mine') {
    if(empty($_SESSION['user_id'])||($_SESSION['user_until']??0)<=time())out(['error'=>'로그인이 필요합니다.'],401);
    $page=max(1,min(10000,(int)($_GET['page']??1)));$offset=($page-1)*60;
@@ -131,8 +132,19 @@ try {
   admin();limit('collection-update',60);$input=jsonInput();$slug=$input['slug']??'';
   if(!is_string($slug)||!array_key_exists($slug,collectionDefaults())||!is_file(__DIR__.'/assets/editorial/'.$slug.'.jpg'))throw new InvalidArgumentException('작가의 수집 사진을 확인해 주세요.');
   $title=textField($input,'title',120,true);$description=textField($input,'description',500);
-  $s=db()->prepare('INSERT INTO circle_collection(slug,title,description) VALUES (?,?,?) ON DUPLICATE KEY UPDATE title=VALUES(title),description=VALUES(description)');$s->execute([$slug,$title,$description]);
-  out(['ok'=>true,'slug'=>$slug,'title'=>$title,'description'=>$description]);
+  $location=textField($input,'location_label',150);$confirmed=($input['location_confirmed']??'')==='yes';
+  $lat=null;$lng=null;
+  if($confirmed){
+   if($location==='')throw new InvalidArgumentException('확인한 장소 이름을 적어 주세요.');
+   $lat=round(coordinate($input['lat']??null,-90,90),3);$lng=round(coordinate($input['lng']??null,-180,180),3);
+  }
+  $draftLat=null;$draftLng=null;
+  if(array_key_exists('draft_lat',$input)||array_key_exists('draft_lng',$input)){
+   $draftLat=coordinate($input['draft_lat']??null,-90,90);$draftLng=coordinate($input['draft_lng']??null,-180,180);
+  }
+  $s=db()->prepare('INSERT INTO circle_collection(slug,title,description,draft_lat,draft_lng,location_label,public_lat,public_lng,location_confirmed) VALUES (?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE title=VALUES(title),description=VALUES(description),draft_lat=COALESCE(VALUES(draft_lat),draft_lat),draft_lng=COALESCE(VALUES(draft_lng),draft_lng),location_label=VALUES(location_label),public_lat=VALUES(public_lat),public_lng=VALUES(public_lng),location_confirmed=VALUES(location_confirmed)');
+  $s->execute([$slug,$title,$description,$draftLat,$draftLng,$location,$lat,$lng,$confirmed?1:0]);
+  out(['ok'=>true,'slug'=>$slug,'title'=>$title,'description'=>$description,'location_label'=>$confirmed?$location:'','public_lat'=>$lat,'public_lng'=>$lng]);
  }
  if($action==='upload') {
   $data=validateUpload($_POST);

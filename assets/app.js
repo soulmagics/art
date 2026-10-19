@@ -61,9 +61,43 @@ function recordEdit(p,refresh){
 }
 function collectionEdit(item,refresh){
  const dialog=document.createElement('dialog');dialog.setAttribute('aria-label','작가의 수집 수정');
- dialog.innerHTML='<form class="edit-form"><h2>작가의 수집 수정</h2><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 사진"><label for="collection-title">제목</label><input id="collection-title" name="title" maxlength="120" required value="'+esc(item.title)+'"><label for="collection-description">설명</label><textarea id="collection-description" name="description" maxlength="500">'+esc(item.description||'')+'</textarea><p class="muted">저장하면 공개 아카이브에 바로 반영됩니다. 사진은 바뀌지 않습니다.</p><p class="edit-error" role="alert"></p><div class="row"><button type="button" class="secondary" data-close>취소</button><button type="submit">수정 저장</button></div></form>';
+ const savedLat=item.draft_lat??item.public_lat??'',savedLng=item.draft_lng??item.public_lng??'';
+ dialog.innerHTML='<form class="edit-form"><h2>작가의 수집 수정</h2><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 사진">'+
+ '<label for="collection-title">제목</label><input id="collection-title" name="title" maxlength="120" required value="'+esc(item.title)+'">'+
+ '<label for="collection-description">설명</label><textarea id="collection-description" name="description" maxlength="500">'+esc(item.description||'')+'</textarea>'+
+ '<fieldset class="collection-location"><legend>촬영 위치</legend><p class="muted">원본 사진의 GPS는 장소 확인을 위한 제안입니다. 원본 사진은 서버로 전송하지 않습니다.</p>'+
+ '<label for="collection-original">해당 사진 원본에서 GPS 읽기 · 선택</label><input id="collection-original" name="original" type="file" accept="image/*">'+
+ '<p id="collection-gps-status" class="muted" role="status">'+(savedLat!==''&&savedLng!==''?'저장된 위치 후보가 있습니다. 아래 장소를 확인해 주세요.':'위치 후보가 없습니다. 장소를 직접 입력하거나 원본 사진을 선택해 주세요.')+'</p>'+
+ '<label for="collection-location">장소 이름 · 예: 서울 종로구 인사동</label><input id="collection-location" name="location_label" maxlength="150" value="'+esc(item.draft_location_label||'')+'">'+
+ '<div class="row coordinate-row"><label for="collection-lat">위도<input id="collection-lat" name="lat" type="number" step="any" min="-90" max="90" value="'+esc(savedLat)+'"></label><label for="collection-lng">경도<input id="collection-lng" name="lng" type="number" step="any" min="-180" max="180" value="'+esc(savedLng)+'"></label></div>'+
+ '<label><input name="location_confirmed" type="checkbox" '+(item.location_confirmed?'checked':'')+'>이 사진의 촬영 장소를 확인했습니다. 장소 이름과 대략적인 위치를 공개합니다.</label></fieldset>'+
+ '<p class="muted">제목·설명은 저장 즉시 공개됩니다. 확인 전 위치는 공개하거나 지도에 표시하지 않습니다.</p><p class="edit-error" role="alert"></p><div class="row"><button type="button" class="secondary" data-close>취소</button><button type="submit">수정 저장</button></div></form>';
  document.body.append(dialog);dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
- const form=dialog.querySelector('form');form.onsubmit=async e=>{e.preventDefault();const save=form.querySelector('[type=submit]');save.disabled=true;try{const result=await post('collection-update',{slug:item.slug,title:form.elements.namedItem('title').value,description:form.elements.namedItem('description').value});Object.assign(item,result);dialog.close();await refresh();notice('작가의 수집 설명을 공개 화면에 반영했습니다.');}catch(err){form.querySelector('.edit-error').textContent=err.message;save.disabled=false;}};
+ const form=dialog.querySelector('form');
+ form.elements.namedItem('original').onchange=async()=>{
+  const file=form.elements.namedItem('original').files[0];if(!file)return;
+  const status=dialog.querySelector('#collection-gps-status');status.textContent='원본 사진의 위치를 읽고 있습니다…';
+  try{
+   if(!window.exifr?.gps)throw Error('사진 위치 읽기 기능을 불러오지 못했습니다.');
+   const gps=await exifr.gps(file);
+   if(!gps||!Number.isFinite(gps.latitude)||!Number.isFinite(gps.longitude))throw Error('이 사진에 GPS 위치가 없습니다. 장소를 직접 입력해 주세요.');
+   form.elements.namedItem('lat').value=gps.latitude.toFixed(6);form.elements.namedItem('lng').value=gps.longitude.toFixed(6);
+   form.elements.namedItem('location_confirmed').checked=false;
+   status.textContent='사진의 위치 좌표를 찾았습니다. 장소 이름을 확인하고 공개 여부를 선택해 주세요.';
+  }catch(err){status.textContent=err.message;}
+ };
+ form.onsubmit=async e=>{
+  e.preventDefault();const save=form.querySelector('[type=submit]');save.disabled=true;
+  try{
+   const field=name=>form.elements.namedItem(name),lat=field('lat').value.trim(),lng=field('lng').value.trim(),confirmed=field('location_confirmed').checked;
+   if(Boolean(lat)!==Boolean(lng))throw Error('위도와 경도를 함께 입력해 주세요.');
+   if(confirmed&&(!field('location_label').value.trim()||!lat||!lng))throw Error('공개할 장소 이름과 좌표를 확인해 주세요.');
+   const payload={slug:item.slug,title:field('title').value,description:field('description').value,location_label:field('location_label').value,location_confirmed:confirmed?'yes':'no'};
+   if(lat&&lng){payload.draft_lat=lat;payload.draft_lng=lng;}
+   if(confirmed){payload.lat=lat;payload.lng=lng;}
+   const result=await post('collection-update',payload);Object.assign(item,result);dialog.close();await refresh();notice(confirmed?'작가의 수집과 확인된 위치를 공개했습니다.':'작가의 수집을 저장했습니다. 확인 전 위치는 비공개입니다.');
+  }catch(err){form.querySelector('.edit-error').textContent=err.message;save.disabled=false;}
+ };
 }
 function cards(items,adminMode=false){
  return items.map(p=>'<article class="card '+(isPhoto(p)?'photo-card':'text-card')+'"><button class="card-open secondary" data-detail="'+p.id+'" aria-label="'+esc(isPhoto(p)?p.location_label+' 사진 보기':p.nickname+'님의 글 보기')+'">'+
@@ -83,11 +117,11 @@ function detail(p){
 }
 function collectionMarkup(){
  if(!collection.length)return '';
- return '<section class="curated-section" aria-labelledby="curated-title"><div class="controls"><div><p class="eyebrow">THE ARTIST’S COLLECTION</p><h2 id="curated-title">작가의 수집 <small>'+collection.length+'장</small></h2></div><p class="curated-intro">누구나 로그인 없이 볼 수 있습니다. 촬영 장소 미확인 사진은 지도와 별도로 전시합니다.</p></div><div class="grid curated-grid">'+collection.map((item,i)=>'<article class="card curated-card"><button class="card-open secondary" type="button" data-curated="'+i+'" aria-label="'+esc(item.title)+' 사진 크게 보기"><span class="photo-mat"><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진" loading="lazy"><span class="photo-tag">작가의 수집</span></span></button><p><strong>'+esc(item.title)+'</strong><br>'+(item.description?'<span class="curated-description">'+esc(item.description)+'</span><br>':'')+'<span class="muted">장소 미확인 · 지도 표시 없음</span></p></article>').join('')+'</div></section>';
+ return '<section class="curated-section" aria-labelledby="curated-title"><div class="controls"><div><p class="eyebrow">THE ARTIST’S COLLECTION</p><h2 id="curated-title">작가의 수집 <small>'+collection.length+'장</small></h2></div><p class="curated-intro">누구나 로그인 없이 볼 수 있습니다. 사진 속 장소는 확인된 경우에만 표시합니다.</p></div><div class="grid curated-grid">'+collection.map((item,i)=>'<article class="card curated-card"><button class="card-open secondary" type="button" data-curated="'+i+'" aria-label="'+esc(item.title)+' 사진 크게 보기"><span class="photo-mat"><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진" loading="lazy"><span class="photo-tag">작가의 수집</span></span></button><p><strong>'+esc(item.title)+'</strong><br>'+(item.description?'<span class="curated-description">'+esc(item.description)+'</span><br>':'')+'<span class="muted">'+esc(item.location_label||'장소 미확인')+' · 지도 표시 없음</span></p></article>').join('')+'</div></section>';
 }
 function wireCollection(){app.querySelectorAll('[data-curated]').forEach(button=>button.onclick=()=>{
  const item=collection[Number(button.dataset.curated)];if(!item)return;
- const dialog=document.createElement('dialog');dialog.innerHTML='<button class="secondary" data-close>닫기</button><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진"><h2>'+esc(item.title)+'</h2>'+(item.description?'<p class="record-caption">'+esc(item.description)+'</p>':'')+'<p class="muted">작가의 수집 · 촬영 장소 미확인 · 지도 표시 없음</p>';
+ const dialog=document.createElement('dialog');dialog.innerHTML='<button class="secondary" data-close>닫기</button><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진"><h2>'+esc(item.title)+'</h2>'+(item.description?'<p class="record-caption">'+esc(item.description)+'</p>':'')+'<p class="muted">작가의 수집 · '+esc(item.location_label||'촬영 장소 미확인')+' · 지도 표시 없음</p>';
  document.body.append(dialog);dialog.setAttribute('aria-label',item.title+' 사진');dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
  });}
 function pagination(total,current){return '<div class="row pagination"><button id="previous" class="secondary" '+(current===1?'disabled':'')+'>← 이전</button><span>'+current+' / '+Math.max(1,Math.ceil(total/60))+' 페이지</span><button id="next" class="secondary" '+(current*60>=total?'disabled':'')+'>다음 →</button></div>';}
@@ -138,6 +172,7 @@ async function archive(home=false){
  const revision=++archiveRevision;
  const query=new URLSearchParams(home?{page:1}:{...filters,page});
  const data=await api('list&'+query);if(revision!==archiveRevision)return;destroyBento();destroyArchiveGrid();posts=data.posts;app.innerHTML=home?homeMarkup(data):archiveMarkup(data);
+ if(!home&&location.hash==='#curated-title')requestAnimationFrame(()=>document.getElementById('curated-title')?.scrollIntoView({block:'start'}));
  if(home)destroyBento=window.CIRCLE_BENTO?.mount(app.querySelector('[data-bento]'))||(()=>{});
  else destroyArchiveGrid=mountArchiveGrid(app.querySelector('.archive-grid'));
  wireDetails();wireCollection();wireMission();$('surprise').onclick=()=>{if(posts.length)detail(posts[Math.floor(Math.random()*posts.length)]);};
@@ -286,12 +321,12 @@ async function adminPage(){
   googleButton('admin-google-button',async()=>{if(isAdmin)await adminPage();else notice('이 Google 계정은 관리자에 연결되지 않았습니다.');});
   $('login').onsubmit=async e=>{e.preventDefault();$('login-button').disabled=true;try{await post('login',{password:$('password').value});isAdmin=true;await adminPage();}catch(err){error(err);if($('login-button'))$('login-button').disabled=false;}};return;
  }
- let data;try{data=await api('manage&status='+manageStatus+'&page='+managePage);}catch(err){if(err.status===401){isAdmin=false;await adminPage();}throw err;}
+ let data,managedCollection;try{const result=await Promise.all([api('manage&status='+manageStatus+'&page='+managePage),api('collection-manage')]);data=result[0];managedCollection=result[1].items;}catch(err){if(err.status===401){isAdmin=false;await adminPage();}throw err;}
  posts=data.posts;const labels={pending:'승인 대기',approved:'공개',hidden:'숨김',rejected:'거절'};
  app.innerHTML='<div class="controls"><h2>'+labels[manageStatus]+' · '+data.total+'</h2><button id="logout" class="secondary">로그아웃</button></div><div class="row" aria-label="관리 상태">'+
- Object.entries(labels).map(([status,label])=>'<button class="secondary" data-status="'+status+'" aria-pressed="'+(status===manageStatus)+'">'+label+'</button>').join('')+'<button id="reload" class="secondary">새로고침</button></div><section id="managed-records" class="grid">'+cards(posts,true)+'</section>'+pagination(data.total,managePage)+(collection.length?'<section class="admin-collection"><div class="controls"><div><p class="eyebrow">THE ARTIST’S COLLECTION</p><h2>작가의 수집 글 관리</h2><p class="muted">이 사진은 로그인 없이 공개됩니다. 여기서 제목과 설명을 수정할 수 있습니다.</p></div><a class="text-link" href="'+base+'/archive/#curated-title">공개 화면 보기 ↗</a></div><div class="grid curated-grid">'+collection.map((item,i)=>'<article class="card"><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진" loading="lazy"><p><strong>'+esc(item.title)+'</strong>'+(item.description?'<br><span class="muted">'+esc(item.description)+'</span>':'')+'</p><button type="button" class="secondary" data-collection-edit="'+i+'">제목·설명 수정</button></article>').join('')+'</div></section>':'');
+ Object.entries(labels).map(([status,label])=>'<button class="secondary" data-status="'+status+'" aria-pressed="'+(status===manageStatus)+'">'+label+'</button>').join('')+'<button id="reload" class="secondary">새로고침</button></div><section id="managed-records" class="grid">'+cards(posts,true)+'</section>'+pagination(data.total,managePage)+(managedCollection.length?'<section class="admin-collection"><div class="controls"><div><p class="eyebrow">THE ARTIST’S COLLECTION</p><h2>작가의 수집 관리</h2><p class="muted">제목·설명과 사진 속 장소를 확인해 저장합니다. 확인 전 GPS 후보는 비공개입니다.</p></div><a class="text-link" href="'+base+'/archive/#curated-title">공개 화면 보기 ↗</a></div><div class="grid curated-grid">'+managedCollection.map((item,i)=>'<article class="card"><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진" loading="lazy"><p><strong>'+esc(item.title)+'</strong>'+(item.description?'<br><span class="muted">'+esc(item.description)+'</span>':'')+'<br><span class="muted">'+esc(item.location_label||((item.draft_lat!==null&&item.draft_lng!==null)?'좌표 후보 있음 · 장소 확인 필요':'위치 미입력'))+'</span></p><button type="button" class="secondary" data-collection-edit="'+i+'">제목·설명·위치 수정</button></article>').join('')+'</div></section>':'');
  wireDetails();
- app.querySelectorAll('[data-collection-edit]').forEach(b=>b.onclick=()=>collectionEdit(collection[Number(b.dataset.collectionEdit)],adminPage));
+ app.querySelectorAll('[data-collection-edit]').forEach(b=>b.onclick=()=>collectionEdit(managedCollection[Number(b.dataset.collectionEdit)],adminPage));
  app.querySelectorAll('[data-status]').forEach(b=>b.onclick=()=>{manageStatus=b.dataset.status;managePage=1;adminPage().catch(error);});
  app.querySelectorAll('#managed-records .card').forEach((card,i)=>{
   const row=document.createElement('div');row.className='row';const actions=manageStatus==='pending'?['approved','rejected']:manageStatus==='approved'?['hidden']:['approved'];

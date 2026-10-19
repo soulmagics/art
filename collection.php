@@ -16,14 +16,20 @@ function collectionDefaults(): array {
  ];
 }
 
-function collectionItems(string $base): array {
+function collectionItems(string $base,bool $admin=false): array {
  $saved=[];
- foreach(db()->query('SELECT slug,title,description FROM circle_collection')->fetchAll() as $row)$saved[$row['slug']]=$row;
+ $columns='slug,title,description,location_label,location_confirmed,public_lat,public_lng'.($admin?',draft_lat,draft_lng':'');
+ foreach(db()->query('SELECT '.$columns.' FROM circle_collection')->fetchAll() as $row)$saved[$row['slug']]=$row;
  $items=[];
  foreach(collectionDefaults() as $slug=>$defaultTitle){
   if(!is_file(__DIR__.'/assets/editorial/'.$slug.'.jpg'))continue;
   $row=$saved[$slug]??[];
-  $items[]=['slug'=>$slug,'src'=>$base.'/assets/editorial/'.$slug.'.jpg','title'=>$row['title']??$defaultTitle,'description'=>$row['description']??''];
+  $confirmed=(int)($row['location_confirmed']??0)===1;
+  $item=['slug'=>$slug,'src'=>$base.'/assets/editorial/'.$slug.'.jpg','title'=>$row['title']??$defaultTitle,'description'=>$row['description']??'',
+   'location_label'=>$confirmed?($row['location_label']??''):'',
+   'public_lat'=>$confirmed?($row['public_lat']??null):null,'public_lng'=>$confirmed?($row['public_lng']??null):null];
+  if($admin){$item['draft_location_label']=$row['location_label']??'';$item['draft_lat']=$row['draft_lat']??null;$item['draft_lng']=$row['draft_lng']??null;$item['location_confirmed']=$confirmed;}
+  $items[]=$item;
  }
  return $items;
 }

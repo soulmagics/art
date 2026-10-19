@@ -243,6 +243,10 @@ dialog h2{clear:both;margin-top:20px}
 .edit-form textarea{min-height:130px}
 .edit-form .row{justify-content:flex-end;margin-top:8px}
 .edit-error{color:#a0392d;min-height:1em}
+.collection-location{border-top:1px solid var(--line);margin-top:14px;padding-top:18px}
+.collection-location legend{font-family:var(--font-display);font-size:24px;padding:0 0 4px}
+.collection-location .coordinate-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.collection-location .coordinate-row label{min-width:0}
 .account-record>button{margin:0 0 16px 16px}
 .curated-description{display:inline-block;margin:5px 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .admin-collection{margin-top:64px;padding-top:32px;border-top:1px solid var(--line)}
