@@ -247,6 +247,9 @@ dialog h2{clear:both;margin-top:20px}
 .collection-location legend{font-family:var(--font-display);font-size:24px;padding:0 0 4px}
 .collection-location .coordinate-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .collection-location .coordinate-row label{min-width:0}
+.edit-form .location-actions{justify-content:flex-start;margin:4px 0}
+.collection-location-preview{height:250px;margin:12px 0;border:1px solid var(--line);border-radius:var(--radius-input);overflow:hidden;z-index:0}
+.collection-location-preview[hidden]{display:none}
 .artist-map-pin{display:grid;place-items:center;border:2px solid var(--forest);border-radius:50%;background:var(--paper);color:var(--forest);box-shadow:0 2px 8px #24272133;font:27px/1 Georgia,serif}
 .artist-map-pin span{transform:translateY(-1px)}
 .map-curated-card{border-color:var(--forest)}

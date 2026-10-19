@@ -66,26 +66,55 @@ function collectionEdit(item,refresh){
  '<label for="collection-title">제목</label><input id="collection-title" name="title" maxlength="120" required value="'+esc(item.title)+'">'+
  '<label for="collection-description">설명</label><textarea id="collection-description" name="description" maxlength="500">'+esc(item.description||'')+'</textarea>'+
  '<fieldset class="collection-location"><legend>촬영 위치</legend><p class="muted">원본 사진의 GPS는 장소 확인을 위한 제안입니다. 원본 사진은 서버로 전송하지 않습니다.</p>'+
- '<label for="collection-original">해당 사진 원본에서 GPS 읽기 · 선택</label><input id="collection-original" name="original" type="file" accept="image/*">'+
- '<p id="collection-gps-status" class="muted" role="status">'+(savedLat!==''&&savedLng!==''?'저장된 위치 후보가 있습니다. 아래 장소를 확인해 주세요.':'위치 후보가 없습니다. 장소를 직접 입력하거나 원본 사진을 선택해 주세요.')+'</p>'+
+ '<label for="collection-original">해당 사진의 원본 선택</label><input id="collection-original" name="original" type="file" accept="image/*">'+
+ '<div class="row location-actions"><button id="collection-read-gps" class="secondary" type="button" disabled>사진 GPS 읽고 지도 보기</button><button id="collection-preview-coords" class="secondary" type="button">입력한 좌표 지도에서 보기</button></div>'+
+ '<p id="collection-gps-status" class="muted" role="status">'+(savedLat!==''&&savedLng!==''?'저장된 위치 후보가 있습니다. 아래 좌표로 지도에서 확인할 수 있습니다.':'원본을 선택한 뒤 GPS 읽기 버튼을 누르거나 좌표를 직접 입력해 주세요.')+'</p>'+
+ '<div id="collection-location-preview" class="collection-location-preview" role="img" aria-label="촬영 위치 후보 지도" hidden></div><p class="muted">원본 사진은 업로드하지 않습니다. 좌표는 저장할 때만 서버로 전송하며, 공개 지도에는 대략적인 위치만 표시합니다. 지도 배경을 열면 대략적인 지도 영역을 OpenStreetMap에 요청합니다.</p>'+
  '<label for="collection-location">장소 이름 · 예: 서울 종로구 인사동</label><input id="collection-location" name="location_label" maxlength="150" value="'+esc(item.draft_location_label||'')+'">'+
  '<div class="row coordinate-row"><label for="collection-lat">위도<input id="collection-lat" name="lat" type="number" step="any" min="-90" max="90" value="'+esc(savedLat)+'"></label><label for="collection-lng">경도<input id="collection-lng" name="lng" type="number" step="any" min="-180" max="180" value="'+esc(savedLng)+'"></label></div>'+
  '<label><input name="location_confirmed" type="checkbox" '+(item.location_confirmed?'checked':'')+'>이 사진의 촬영 장소를 확인했습니다. 장소 이름과 대략적인 위치를 공개합니다.</label></fieldset>'+
  '<p class="muted">제목·설명은 저장 즉시 공개됩니다. 확인 전 위치는 공개하거나 지도에 표시하지 않습니다.</p><p class="edit-error" role="alert"></p><div class="row"><button type="button" class="secondary" data-close>취소</button><button type="submit">수정 저장</button></div></form>';
- document.body.append(dialog);dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
- const form=dialog.querySelector('form');
- form.elements.namedItem('original').onchange=async()=>{
-  const file=form.elements.namedItem('original').files[0];if(!file)return;
-  const status=dialog.querySelector('#collection-gps-status');status.textContent='원본 사진의 위치를 읽고 있습니다…';
+ document.body.append(dialog);dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.showModal();
+ const form=dialog.querySelector('form'),status=dialog.querySelector('#collection-gps-status'),preview=dialog.querySelector('#collection-location-preview');
+ let locationMap=null,locationPin=null;
+ const clearPreview=()=>{locationMap?.remove();locationMap=null;locationPin=null;preview.hidden=true;};
+ const showPreview=(lat,lng)=>{
+  if(!window.L){status.textContent='지도 화면을 불러오지 못했습니다. 좌표는 아래에서 확인할 수 있습니다.';return;}
+  preview.hidden=false;
+  if(!locationMap){
+   locationMap=L.map(preview,{scrollWheelZoom:false}).setView([lat,lng],15);
+   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(locationMap).on('tileerror',()=>{status.textContent='지도 배경 연결이 원활하지 않습니다. 아래 좌표는 확인할 수 있습니다.';});
+   locationPin=L.marker([lat,lng],{title:'사진 위치 후보'}).addTo(locationMap);
+  }else{locationMap.setView([lat,lng],15);locationPin.setLatLng([lat,lng]);}
+  requestAnimationFrame(()=>locationMap?.invalidateSize());preview.scrollIntoView({block:'nearest'});
+ };
+ dialog.addEventListener('close',()=>{clearPreview();dialog.remove();});
+ form.elements.namedItem('original').onchange=()=>{
+  const file=form.elements.namedItem('original').files[0];dialog.querySelector('#collection-read-gps').disabled=!file;
+  clearPreview();form.elements.namedItem('location_confirmed').checked=false;
+  if(file){form.elements.namedItem('lat').value='';form.elements.namedItem('lng').value='';}
+  status.textContent=file?'선택한 파일: '+file.name+' · GPS 읽기 버튼을 눌러 위치를 확인해 주세요.':'원본을 선택한 뒤 GPS 읽기 버튼을 눌러 주세요.';
+ };
+ dialog.querySelector('#collection-read-gps').onclick=async()=>{
+  const file=form.elements.namedItem('original').files[0];if(!file){status.textContent='이 사진의 원본 파일을 먼저 선택해 주세요.';return;}
+  const button=dialog.querySelector('#collection-read-gps');button.disabled=true;status.textContent='선택한 사진의 GPS를 읽고 있습니다…';
   try{
    if(!window.exifr?.gps)throw Error('사진 위치 읽기 기능을 불러오지 못했습니다.');
-   const gps=await exifr.gps(file);
-   if(!gps||!Number.isFinite(gps.latitude)||!Number.isFinite(gps.longitude))throw Error('이 사진에 GPS 위치가 없습니다. 장소를 직접 입력해 주세요.');
+   const gps=await exifr.gps(file);if(form.elements.namedItem('original').files[0]!==file)return;
+   if(!gps||!Number.isFinite(gps.latitude)||!Number.isFinite(gps.longitude)||Math.abs(gps.latitude)>90||Math.abs(gps.longitude)>180)throw Error('이 사진에 유효한 GPS 위치가 없습니다. 장소를 직접 입력해 주세요.');
    form.elements.namedItem('lat').value=gps.latitude.toFixed(6);form.elements.namedItem('lng').value=gps.longitude.toFixed(6);
-   form.elements.namedItem('location_confirmed').checked=false;
-   status.textContent='사진의 위치 좌표를 찾았습니다. 장소 이름을 확인하고 공개 여부를 선택해 주세요.';
-  }catch(err){status.textContent=err.message;}
+   form.elements.namedItem('location_confirmed').checked=false;status.textContent='사진에서 위치 후보를 찾았습니다. 장소 이름을 확인하고 공개 여부를 선택해 주세요. 아직 저장되지 않았습니다.';
+   showPreview(gps.latitude,gps.longitude);
+  }catch(err){status.textContent=err.message;clearPreview();}finally{button.disabled=!form.elements.namedItem('original').files[0];}
  };
+ dialog.querySelector('#collection-preview-coords').onclick=()=>{
+  const latText=form.elements.namedItem('lat').value.trim(),lngText=form.elements.namedItem('lng').value.trim(),lat=Number(latText),lng=Number(lngText);
+  if(!latText||!lngText||!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180){status.textContent='유효한 위도와 경도를 함께 입력해 주세요.';return;}
+  status.textContent='입력한 좌표의 위치 후보입니다. 장소 이름을 확인하고 공개 여부를 선택해 주세요. 아직 저장되지 않았습니다.';
+  try{showPreview(lat,lng);}catch{status.textContent='지도 화면을 표시하지 못했습니다. 입력한 좌표는 아래에서 확인할 수 있습니다.';clearPreview();}
+ };
+ for(const name of ['lat','lng'])form.elements.namedItem(name).oninput=()=>{clearPreview();form.elements.namedItem('location_confirmed').checked=false;};
+ form.elements.namedItem('location_label').oninput=()=>{form.elements.namedItem('location_confirmed').checked=false;};
  form.onsubmit=async e=>{
   e.preventDefault();const save=form.querySelector('[type=submit]');save.disabled=true;
   try{
