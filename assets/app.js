@@ -117,13 +117,15 @@ function detail(p){
 }
 function collectionMarkup(){
  if(!collection.length)return '';
- return '<section class="curated-section" aria-labelledby="curated-title"><div class="controls"><div><p class="eyebrow">THE ARTIST’S COLLECTION</p><h2 id="curated-title">작가의 수집 <small>'+collection.length+'장</small></h2></div><p class="curated-intro">누구나 로그인 없이 볼 수 있습니다. 사진 속 장소는 확인된 경우에만 표시합니다.</p></div><div class="grid curated-grid">'+collection.map((item,i)=>'<article class="card curated-card"><button class="card-open secondary" type="button" data-curated="'+i+'" aria-label="'+esc(item.title)+' 사진 크게 보기"><span class="photo-mat"><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진" loading="lazy"><span class="photo-tag">작가의 수집</span></span></button><p><strong>'+esc(item.title)+'</strong><br>'+(item.description?'<span class="curated-description">'+esc(item.description)+'</span><br>':'')+'<span class="muted">'+esc(item.location_label||'장소 미확인')+' · 지도 표시 없음</span></p></article>').join('')+'</div></section>';
+ return '<section class="curated-section" aria-labelledby="curated-title"><div class="controls"><div><p class="eyebrow">THE ARTIST’S COLLECTION</p><h2 id="curated-title">작가의 수집 <small>'+collection.length+'장</small></h2></div><p class="curated-intro">누구나 로그인 없이 볼 수 있습니다. 촬영 장소를 확인한 사진만 지도에도 표시합니다.</p></div><div class="grid curated-grid">'+collection.map((item,i)=>'<article class="card curated-card"><button class="card-open secondary" type="button" data-curated="'+i+'" aria-label="'+esc(item.title)+' 사진 크게 보기"><span class="photo-mat"><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진" loading="lazy"><span class="photo-tag">작가의 수집</span></span></button><p><strong>'+esc(item.title)+'</strong><br>'+(item.description?'<span class="curated-description">'+esc(item.description)+'</span><br>':'')+'<span class="muted">'+esc(item.location_label||'장소 미확인')+' · '+(isMappedCollection(item)?'지도에서 보기 가능':'지도 표시 없음')+'</span></p></article>').join('')+'</div></section>';
 }
-function wireCollection(){app.querySelectorAll('[data-curated]').forEach(button=>button.onclick=()=>{
- const item=collection[Number(button.dataset.curated)];if(!item)return;
- const dialog=document.createElement('dialog');dialog.innerHTML='<button class="secondary" data-close>닫기</button><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진"><h2>'+esc(item.title)+'</h2>'+(item.description?'<p class="record-caption">'+esc(item.description)+'</p>':'')+'<p class="muted">작가의 수집 · '+esc(item.location_label||'촬영 장소 미확인')+' · 지도 표시 없음</p>';
+function isMappedCollection(item){return !!item.location_label&&item.public_lat!=null&&item.public_lng!=null&&Number.isFinite(Number(item.public_lat))&&Number.isFinite(Number(item.public_lng));}
+function collectionDetail(item){
+ if(!item)return;
+ const dialog=document.createElement('dialog');dialog.innerHTML='<button class="secondary" data-close>닫기</button><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진"><h2>'+esc(item.title)+'</h2>'+(item.description?'<p class="record-caption">'+esc(item.description)+'</p>':'')+'<p class="muted">작가의 수집 · '+esc(item.location_label||'촬영 장소 미확인')+'</p>'+(isMappedCollection(item)?'<a class="button" href="'+(route==='map'?base+'/archive/#curated-title':base+'/map/?lat='+encodeURIComponent(item.public_lat)+'&lng='+encodeURIComponent(item.public_lng))+'">'+(route==='map'?'아카이브에서 보기':'지도에서 보기')+'</a>':'<p class="muted">지도 표시 없음</p>');
  document.body.append(dialog);dialog.setAttribute('aria-label',item.title+' 사진');dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
- });}
+}
+function wireCollection(){app.querySelectorAll('[data-curated]').forEach(button=>button.onclick=()=>collectionDetail(collection[Number(button.dataset.curated)]));}
 function pagination(total,current){return '<div class="row pagination"><button id="previous" class="secondary" '+(current===1?'disabled':'')+'>← 이전</button><span>'+current+' / '+Math.max(1,Math.ceil(total/60))+' 페이지</span><button id="next" class="secondary" '+(current*60>=total?'disabled':'')+'>다음 →</button></div>';}
 function missionMarkup(){
  const m=missions[missionIndex];
@@ -300,7 +302,7 @@ function uploadXHR(fd,onProgress){
  });
 }
 async function mapPage(){
- app.innerHTML='<div class="page-heading"><p class="eyebrow">A DIFFERENT MAP OF THE CITY</p><h1>발견은 여기서<br>이어집니다<span class="heading-dot">.</span></h1><p>핀을 눌러 누군가의 발밑에서 시작된 이야기를 만나보세요.</p></div><p class="muted">사진 기록의 대략적인 위치를 표시합니다. 사진의 위치와 약간 다를 수 있으며 완전한 익명화를 보장하지 않습니다. 글 기록은 아카이브에서 볼 수 있습니다.</p><div id="archive-map" class="map"></div><p id="map-count" role="status"></p><section id="map-grid" class="grid"></section>';
+ app.innerHTML='<div class="page-heading"><p class="eyebrow">A DIFFERENT MAP OF THE CITY</p><h1>발견은 여기서<br>이어집니다<span class="heading-dot">.</span></h1><p>핀을 눌러 누군가의 발밑에서 시작된 이야기를 만나보세요.</p></div><p class="muted">관리자가 촬영 장소를 확인한 작가 사진과 승인된 관람객 사진의 대략적인 위치만 표시합니다. 실제 촬영 지점과 다를 수 있으며 완전한 익명화를 보장하지 않습니다. 글 기록은 아카이브에서 볼 수 있습니다.</p><div id="archive-map" class="map"></div><p id="map-count" role="status"></p><section id="map-grid" class="grid"></section>';
  map=createMap('archive-map');if(!map){$('map-count').textContent='지도 연결을 확인해 주세요.';return;}markers=L.layerGroup().addTo(map);
  const query=new URLSearchParams(location.search);if(query.has('lat')&&query.has('lng')){const lat=Number(query.get('lat')),lng=Number(query.get('lng'));if(Number.isFinite(lat)&&Number.isFinite(lng)&&Math.abs(lat)<=90&&Math.abs(lng)<=180)map.setView([lat,lng],16);}
  let controller,timer,revision=0;
@@ -309,7 +311,12 @@ async function mapPage(){
   try{
    const data=await api('list&south='+Math.max(-90,bounds.getSouth())+'&north='+Math.min(90,bounds.getNorth())+'&west='+Math.max(-180,bounds.getWest())+'&east='+Math.min(180,bounds.getEast()),{signal:controller.signal});
    if(current!==revision)return;posts=data.posts;markers.clearLayers();posts.forEach(p=>L.marker([p.public_lat,p.public_lng]).addTo(markers).on('click',()=>detail(p)));
-   $('map-count').textContent='현재 지도에서 '+posts.length+'개의 원'+(posts.length===200?' · 표시 한도에 도달했습니다. 확대해 주세요.':'');$('map-grid').innerHTML=cards(posts);wireDetails();
+   const visibleArtists=collection.filter(item=>isMappedCollection(item)&&bounds.contains([Number(item.public_lat),Number(item.public_lng)]));
+   const artistIcon=L.divIcon({className:'artist-map-pin',html:'<span aria-hidden="true">◎</span>',iconSize:[34,34],iconAnchor:[17,17]});
+   visibleArtists.forEach(item=>L.marker([Number(item.public_lat),Number(item.public_lng)],{icon:artistIcon,title:item.title+' · 작가의 수집'}).addTo(markers).on('click',()=>collectionDetail(item)));
+   $('map-count').textContent='현재 지도에서 작가의 수집 '+visibleArtists.length+'장 · 관람객 사진 '+posts.length+'장'+(posts.length===200?' · 관람객 사진 표시 한도에 도달했습니다. 확대해 주세요.':'');
+   $('map-grid').innerHTML=visibleArtists.map(item=>'<article class="card map-curated-card"><button class="card-open secondary" type="button" data-curated-map="'+esc(item.slug)+'" aria-label="'+esc(item.title)+' 작가 사진 보기"><span class="photo-mat"><img src="'+esc(item.src)+'" alt="'+esc(item.title)+' 멘홀 사진" loading="lazy"><span class="photo-tag">작가의 수집</span></span></button><p><strong>'+esc(item.title)+'</strong><br><span class="muted">'+esc(item.location_label)+'</span></p></article>').join('')+(posts.length?cards(posts):visibleArtists.length?'':'<p class="empty">현재 지도 범위에 확인된 사진이 없습니다. 지도를 움직이거나 축소해 보세요.</p>');
+   app.querySelectorAll('[data-curated-map]').forEach(button=>button.onclick=()=>collectionDetail(collection.find(item=>item.slug===button.dataset.curatedMap)));wireDetails();
   }catch(err){if(err.name!=='AbortError')error(err);}
  }
  map.on('moveend',()=>{clearTimeout(timer);timer=setTimeout(refresh,300);});await refresh();
