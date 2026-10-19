@@ -1,0 +1,13 @@
+Options -Indexes
+DirectoryIndex index.php
+RewriteEngine On
+RewriteRule ^\.git(?:/|$) - [F,L,NC]
+RewriteRule ^(?:upload|archive|map|live|admin)/?$ index.php [L]
+<IfModule mod_headers.c>
+<FilesMatch "\.(?:js|css)$">
+Header set Cache-Control "no-cache"
+</FilesMatch>
+</IfModule>
+<FilesMatch "^\.">
+Require all denied
+</FilesMatch>
