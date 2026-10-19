@@ -1,8 +1,8 @@
 'use strict';
-const {base,kakaoKey,editorial=[],collection=[]}=window.CIRCLE_CONFIG;
+const {base,kakaoKey,googleClientId,editorial=[],collection=[]}=window.CIRCLE_CONFIG;
 const app=document.querySelector('#app');
 const $=id=>document.getElementById(id);
-let uploadKey=crypto.randomUUID().replaceAll('-',''),csrf='',isAdmin=false,posts=[],page=1;
+let uploadKey=crypto.randomUUID().replaceAll('-',''),csrf='',googleNonce='',currentUser=null,isAdmin=false,posts=[],page=1;
 let map,markers,coords=null,source='pin',selectedPhoto=null,previewUrl=null,noticeTimer;
 const route=location.pathname.slice(base.length).replace(/^\/+|\/+$/g,'')||'home';
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -26,6 +26,33 @@ async function api(action,options={}){
  if(!response.ok){const err=Error(data.error||'요청에 실패했습니다.');err.status=response.status;throw err;}return data;
 }
 function post(action,data){return api(action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});}
+async function googleButton(targetId,afterLogin){
+ const target=$(targetId);if(!target)return;
+ if(!googleClientId){target.textContent='구글 로그인 설정을 확인해 주세요.';return;}
+ try{
+  if(!window.google?.accounts?.id)await new Promise((resolve,reject)=>{
+   const script=document.createElement('script');script.src='https://accounts.google.com/gsi/client';script.async=true;script.onload=resolve;script.onerror=()=>reject(Error('구글 로그인 화면을 불러오지 못했습니다.'));document.head.append(script);
+  });
+  if(!target.isConnected)return;
+  google.accounts.id.initialize({client_id:googleClientId,nonce:googleNonce,auto_select:false,callback:async response=>{
+   try{const result=await post('google-login',{credential:response.credential});currentUser=result.user;isAdmin=result.admin;googleNonce=(await api('session')).google_nonce;await afterLogin();}
+   catch(err){error(err);}
+  }});
+  google.accounts.id.renderButton(target,{type:'standard',theme:'outline',size:'large',text:'signin_with',shape:'pill',width:260});
+  target.querySelector('div[role=button]')?.setAttribute('aria-label','Google 계정으로 로그인');
+ }catch(err){target.textContent=err.message;}
+}
+function logoutButton(id){const button=$(id);if(button)button.onclick=async()=>{try{await post('logout',{});location.reload();}catch(err){error(err);}};}
+async function accountPage(){
+ if(!currentUser){
+  app.innerHTML='<section class="account-page"><p class="eyebrow">YOUR OWN FIELD NOTES</p><h1>내가 발견한<br><em class="handwritten">원의 기록.</em></h1><p>Google 계정으로 로그인하면 지금부터 남기는 사진과 글이 내 아카이브에 모입니다.</p><div id="google-button" class="google-button" role="group" aria-label="구글 로그인"></div><p class="muted">로그인 없이도 참여할 수 있어요. 이전 익명 기록은 작성자를 확인할 수 없어 자동으로 연결되지 않습니다.</p><a class="button secondary" href="'+base+'/upload/">로그인 없이 참여하기 ↗</a></section>';
+  await googleButton('google-button',accountPage);return;
+ }
+ const data=await api('mine&page='+page);posts=data.posts;
+ const labels={pending:'승인 대기',approved:'공개',hidden:'숨김',rejected:'거절'};
+ app.innerHTML='<section class="account-page"><p class="eyebrow">YOUR OWN FIELD NOTES</p><div class="controls"><div><h1>내 아카이브<span class="heading-dot">.</span></h1><p>'+esc(currentUser.display_name)+'님의 기록 · '+data.total+'개</p></div><button type="button" id="account-logout" class="secondary">로그아웃</button></div><p class="muted">로그인한 상태에서 올린 기록만 보여요. 승인 전 기록은 본인과 관리자에게만 보입니다.</p><a class="button" href="'+base+'/upload/">새 기록 남기기 ↗</a><div class="grid account-grid">'+(posts.length?posts.map(p=>'<div class="account-record"><p class="account-status">'+esc(labels[p.status]||p.status)+'</p>'+cards([p])+'</div>').join(''):'<p class="empty">아직 내 기록이 없습니다. 첫 발견을 남겨 주세요.</p>')+'</div>'+pagination(data.total,page)+'</section>';
+ wireDetails();logoutButton('account-logout');$('previous').onclick=()=>{page--;accountPage().catch(error);};$('next').onclick=()=>{page++;accountPage().catch(error);};
+}
 function cards(items,adminMode=false){
  return items.map(p=>'<article class="card '+(isPhoto(p)?'photo-card':'text-card')+'"><button class="card-open secondary" data-detail="'+p.id+'" aria-label="'+esc(isPhoto(p)?p.location_label+' 사진 보기':p.nickname+'님의 글 보기')+'">'+
   (isPhoto(p)?'<span class="photo-mat"><img src="'+img(p)+'" alt="'+esc(p.caption||'도시의 멘홀')+'" loading="lazy"><span class="photo-tag">'+esc(patternLabel(p.pattern_type))+'</span></span>':'<span class="text-art"><span class="eyebrow">FIELD NOTE · 도시의 이야기</span><span class="card-caption">'+esc(p.caption)+'</span><span class="note-mark" aria-hidden="true">↗</span></span>')+'</button><p>'+
@@ -39,7 +66,7 @@ function detail(p){
  dialog.innerHTML='<button class="secondary" data-close>닫기</button>'+
   (isPhoto(p)?'<img src="'+img(p,false)+'" alt="'+esc(p.caption||'멘홀 사진')+'">':'')+
   '<h2>'+esc(isPhoto(p)?p.location_label:'도시에 남긴 이야기')+'</h2><p class="record-caption">'+esc(p.caption)+'</p><p class="muted">'+esc(p.nickname)+(isPhoto(p)?' · '+esc(patternLabel(p.pattern_type)):'')+'</p>'+
-  (isPhoto(p)?'<a class="button" href="'+base+'/map/?lat='+encodeURIComponent(p.public_lat)+'&lng='+encodeURIComponent(p.public_lng)+'">지도에서 보기</a>':'');
+  (isPhoto(p)&&(!p.status||p.status==='approved')?'<a class="button" href="'+base+'/map/?lat='+encodeURIComponent(p.public_lat)+'&lng='+encodeURIComponent(p.public_lng)+'">지도에서 보기</a>':'');
  document.body.append(dialog);dialog.setAttribute('aria-label',isPhoto(p)?p.location_label:'도시에 남긴 이야기');dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
 }
 function collectionMarkup(){
@@ -137,7 +164,7 @@ async function searchPlace(){
 }
 function upload(){
  const mission=getMission(routeQuery.get('mission'));
- app.innerHTML='<div class="form"><p class="eyebrow">YOUR FIELD NOTE</p><h1>당신의 발견을<br>나눠 주세요<span class="heading-dot">.</span></h1><p>멘홀 사진이나 전시를 보며 떠오른 이야기를 남길 수 있습니다.</p>'+
+ app.innerHTML='<div class="form"><p class="eyebrow">YOUR FIELD NOTE</p><h1>당신의 발견을<br>나눠 주세요<span class="heading-dot">.</span></h1><p>멘홀 사진이나 전시를 보며 떠오른 이야기를 남길 수 있습니다.</p><p class="account-hint">'+(currentUser?'현재 로그인: '+esc(currentUser.display_name)+' · 새 기록은 <a href="'+base+'/account/">내 아카이브</a>에 저장됩니다.':'회원가입 없이 참여할 수 있어요. 내 기록을 모으려면 먼저 <a href="'+base+'/account/">Google 계정으로 로그인</a>해 주세요.')+'</p>'+
  (mission?'<aside class="chosen-mission"><span class="eyebrow">선택한 관찰 미션</span><h2>'+mission.title+'</h2><p>'+mission.prompt+'</p><span class="muted">다른 이야기로 바꿔도 좋아요.</span></aside>':'')+
  '<div class="entry-steps" aria-label="참여 순서"><span><b>01</b> 기록하기</span><span><b>02</b> 관리자 확인</span><span><b>03</b> 함께 보기</span></div>'+
  '<form id="upload-form"><fieldset id="entry-fields"><legend class="sr-only">참여 내용</legend>'+
@@ -200,7 +227,7 @@ function upload(){
    if(mode==='photo')fd.append('photo',await compress(selectedPhoto),'circle.jpg');
    await uploadXHR(fd,n=>$('progress').textContent='기록 전송 중 '+n+'%');
    if(previewUrl)URL.revokeObjectURL(previewUrl);
-   app.innerHTML='<div class="form receipt"><div class="receipt-stamp" aria-hidden="true">◎<small>RECEIVED</small></div><p class="eyebrow">ONE MORE STORY FOR OUR CITY</p><h1><em class="handwritten">당신의 발견</em>이<br>도시에 더해졌어요.</h1><p class="receipt-state" role="status">접수 완료 · 관리자 확인 대기</p><p>기록이 접수되었습니다.<br>관리자 확인 후 아카이브와 전시장 화면에 공개됩니다.<br>지금은 다른 관람객에게 보이지 않아요.</p><div class="row"><a class="button" href="'+base+'/archive/">다른 발견 만나기 ↗</a><a class="button secondary" href="'+base+'/upload/">새 기록 남기기</a></div></div>';app.focus();
+   app.innerHTML='<div class="form receipt"><div class="receipt-stamp" aria-hidden="true">◎<small>RECEIVED</small></div><p class="eyebrow">ONE MORE STORY FOR OUR CITY</p><h1><em class="handwritten">당신의 발견</em>이<br>도시에 더해졌어요.</h1><p class="receipt-state" role="status">접수 완료 · 관리자 확인 대기</p><p>기록이 접수되었습니다.<br>관리자 확인 후 아카이브와 전시장 화면에 공개됩니다.<br>지금은 다른 관람객에게 보이지 않아요.</p><div class="row"><a class="button" href="'+base+'/archive/">다른 발견 만나기 ↗</a>'+(currentUser?'<a class="button secondary" href="'+base+'/account/">내 아카이브 보기</a>':'')+'<a class="button secondary" href="'+base+'/upload/">새 기록 남기기</a></div></div>';app.focus();
   }catch(err){$('progress').textContent=err.message+' 입력 내용은 이 화면에 남아 있습니다. 연결을 확인하고 다시 시도해 주세요.';$('entry-fields').disabled=false;submitting=false;}
  };
 }
@@ -243,7 +270,8 @@ async function mapPage(){
 let manageStatus='pending',managePage=1;
 async function adminPage(){
  if(!isAdmin){
-  app.innerHTML='<div class="form"><h2>관리자 로그인</h2><form id="login"><label for="password">비밀번호</label><input id="password" type="password" autocomplete="current-password" required><button id="login-button">로그인</button></form></div>';
+  app.innerHTML='<div class="form"><h2>관리자 로그인</h2><p>관리자로 연결된 Google 계정 또는 기존 관리자 비밀번호로 로그인하세요.</p><div id="admin-google-button" class="google-button" role="group" aria-label="관리자 구글 로그인"></div><p class="muted">Google 계정이 관리자에 연결되지 않았다면 아래 비밀번호를 사용하세요.</p><form id="login"><label for="password">관리자 비밀번호</label><input id="password" type="password" autocomplete="current-password" required><button id="login-button">로그인</button></form></div>';
+  googleButton('admin-google-button',async()=>{if(isAdmin)await adminPage();else notice('이 Google 계정은 관리자에 연결되지 않았습니다.');});
   $('login').onsubmit=async e=>{e.preventDefault();$('login-button').disabled=true;try{await post('login',{password:$('password').value});isAdmin=true;await adminPage();}catch(err){error(err);if($('login-button'))$('login-button').disabled=false;}};return;
  }
  let data;try{data=await api('manage&status='+manageStatus+'&page='+managePage);}catch(err){if(err.status===401){isAdmin=false;await adminPage();}throw err;}
@@ -258,7 +286,7 @@ async function adminPage(){
  });
  $('reload').onclick=()=>adminPage().catch(error);
  $('previous').onclick=()=>{managePage--;adminPage().catch(error);};$('next').onclick=()=>{managePage++;adminPage().catch(error);};
- $('logout').onclick=async()=>{try{await post('logout',{});location.reload();}catch(err){error(err);}};
+ logoutButton('logout');
 }
 async function live(){
  document.body.classList.add('live-mode');
@@ -277,6 +305,6 @@ async function live(){
  await tick();
 }
 (async()=>{try{
- const session=await api('session');csrf=session.csrf;isAdmin=session.admin;
- switch(route){case'home':await archive(true);break;case'archive':await archive();break;case'upload':upload();break;case'map':await mapPage();break;case'admin':await adminPage();break;case'live':await live();break;default:app.innerHTML='<h2>페이지를 찾을 수 없습니다.</h2>';}
+ const session=await api('session');csrf=session.csrf;googleNonce=session.google_nonce;currentUser=session.user;isAdmin=session.admin;
+ switch(route){case'home':await archive(true);break;case'archive':await archive();break;case'upload':upload();break;case'map':await mapPage();break;case'admin':await adminPage();break;case'account':await accountPage();break;case'live':await live();break;default:app.innerHTML='<h2>페이지를 찾을 수 없습니다.</h2>';}
 }catch(err){app.innerHTML='<h2>잠시 연결하지 못했습니다.</h2><p>'+esc(err.message)+'</p><button id="retry">다시 시도</button>';$('retry').onclick=()=>location.reload();}})();

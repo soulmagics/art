@@ -3,6 +3,7 @@ declare(strict_types=1);
 require __DIR__.'/bootstrap.php';
 require __DIR__.'/validation.php';
 require __DIR__.'/images.php';
+require __DIR__.'/google-auth.php';
 function jsonInput(): array {
  $input=json_decode(file_get_contents('php://input'),true);
  if(!is_array($input))throw new InvalidArgumentException('요청 내용을 확인해 주세요.');
@@ -11,11 +12,20 @@ function jsonInput(): array {
 try {
  $action = $_GET['action'] ?? 'list';
  if ($_SERVER['REQUEST_METHOD']==='GET') {
-  if ($action==='session') out(['csrf'=>$_SESSION['csrf'], 'admin'=>!empty($_SESSION['admin']) && ($_SESSION['admin_until']??0)>time()]);
+  if ($action==='session') {
+   $_SESSION['google_nonce'] ??= bin2hex(random_bytes(24));
+   $user=null;
+   if(!empty($_SESSION['user_id'])&&($_SESSION['user_until']??0)>time()){
+    $s=db()->prepare('SELECT id,display_name,email FROM circle_users WHERE id=?');$s->execute([$_SESSION['user_id']]);$user=$s->fetch()?:null;
+   }
+   out(['csrf'=>$_SESSION['csrf'],'google_nonce'=>$_SESSION['google_nonce'],'user'=>$user,'admin'=>!empty($_SESSION['admin'])&&($_SESSION['admin_until']??0)>time()]);
+  }
   if ($action==='image') {
    $id=$_GET['id']??''; if(!is_string($id)||!preg_match('/^[a-f0-9]{32}$/',$id)) out(['error'=>'사진을 찾을 수 없습니다.'],404);
-   $s=db()->prepare('SELECT post_type,status,image_name,thumb_name FROM circle_posts WHERE id=?');$s->execute([$id]);$row=$s->fetch();
-   if (!$row || $row['post_type']!=='photo' || ($row['status']!=='approved' && (empty($_SESSION['admin']) || ($_SESSION['admin_until']??0)<time()))) out(['error'=>'사진을 찾을 수 없습니다.'],404);
+   $s=db()->prepare('SELECT post_type,status,user_id,image_name,thumb_name FROM circle_posts WHERE id=?');$s->execute([$id]);$row=$s->fetch();
+   $isAdmin=!empty($_SESSION['admin'])&&($_SESSION['admin_until']??0)>time();
+   $isOwner=$row&&$row['user_id']!==null&&$row['user_id']===($_SESSION['user_id']??null)&&($_SESSION['user_until']??0)>time();
+   if (!$row || $row['post_type']!=='photo' || ($row['status']!=='approved'&&!$isAdmin&&!$isOwner)) out(['error'=>'사진을 찾을 수 없습니다.'],404);
    $name=($_GET['thumb']??'')==='1'?$row['thumb_name']:$row['image_name'];$path=$cfg['storage'].'/'.basename($name);
    if (!is_file($path)) out(['error'=>'사진 파일이 없습니다.'],404);
    header('Content-Type: image/jpeg');header('Cache-Control: private, no-store');session_write_close();readfile($path);exit;
@@ -26,6 +36,13 @@ try {
    $page=max(1,min(10000,(int)($_GET['page']??1)));$offset=($page-1)*60;
    $s=db()->prepare("SELECT id,post_type,nickname,caption,location_label,pattern_type,public_lat,public_lng,status,consent_version,created_at FROM circle_posts WHERE status=? ORDER BY created_at ASC,id ASC LIMIT 60 OFFSET $offset");$s->execute([$status]);
    $count=db()->prepare('SELECT COUNT(*) FROM circle_posts WHERE status=?');$count->execute([$status]);
+   out(['posts'=>$s->fetchAll(),'total'=>(int)$count->fetchColumn(),'page'=>$page]);
+  }
+  if ($action==='mine') {
+   if(empty($_SESSION['user_id'])||($_SESSION['user_until']??0)<=time())out(['error'=>'로그인이 필요합니다.'],401);
+   $page=max(1,min(10000,(int)($_GET['page']??1)));$offset=($page-1)*60;
+   $s=db()->prepare("SELECT id,post_type,nickname,caption,pattern_type,location_label,public_lat,public_lng,status,created_at,approved_at FROM circle_posts WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 60 OFFSET $offset");$s->execute([$_SESSION['user_id']]);
+   $count=db()->prepare('SELECT COUNT(*) FROM circle_posts WHERE user_id=?');$count->execute([$_SESSION['user_id']]);
    out(['posts'=>$s->fetchAll(),'total'=>(int)$count->fetchColumn(),'page'=>$page]);
   }
   if ($action==='list') {
@@ -48,6 +65,27 @@ try {
  }
  if($_SERVER['REQUEST_METHOD']!=='POST') out(['error'=>'지원하지 않는 요청입니다.'],405);
  csrf();
+ if($action==='google-login') {
+  limit('google-login',300);$input=jsonInput();$token=$input['credential']??'';
+  if(!is_string($token)||!is_string($_SESSION['google_nonce']??null))throw new InvalidArgumentException('구글 로그인을 다시 시작해 주세요.');
+  $claims=verifyGoogleCredential($token,googleClientId(),$_SESSION['google_nonce'],googleCertificates());
+  if($claims===false)out(['error'=>'구글 계정을 확인하지 못했습니다. 다시 시도해 주세요.'],401);
+  $pdo=db();$pdo->beginTransaction();
+  try{
+   $s=$pdo->prepare('SELECT id FROM circle_users WHERE google_sub=? FOR UPDATE');$s->execute([$claims['sub']]);$id=$s->fetchColumn();
+   $name=is_string($claims['name']??null)?trim($claims['name']):'';if($name==='')$name='도시 관찰자';$name=mb_substr($name,0,120);
+   if($id===false){$id=bin2hex(random_bytes(16));$s=$pdo->prepare('INSERT INTO circle_users(id,google_sub,email,display_name) VALUES (?,?,?,?)');$s->execute([$id,$claims['sub'],$claims['email'],$name]);}
+   else{$s=$pdo->prepare('UPDATE circle_users SET email=?,display_name=? WHERE id=?');$s->execute([$claims['email'],$name,$id]);}
+   $pdo->commit();
+  }catch(Throwable $e){$pdo->rollBack();throw $e;}
+  session_regenerate_id(true);
+  $_SESSION['user_id']=$id;$_SESSION['user_until']=time()+43200;
+  $_SESSION['google_nonce']=bin2hex(random_bytes(24));
+  $_SESSION['admin']=false;unset($_SESSION['admin_until']);
+  $adminEmail=$cfg['admin_google_email']??'';
+  if(is_string($adminEmail)&&$adminEmail!==''&&strcasecmp($claims['email'],$adminEmail)===0&&str_ends_with(strtolower($claims['email']),'@gmail.com')){$_SESSION['admin']=true;$_SESSION['admin_until']=time()+7200;}
+  out(['ok'=>true,'admin'=>$_SESSION['admin'],'user'=>['id'=>$id,'display_name'=>$name,'email'=>$claims['email']]]);
+ }
  if($action==='login') {
   limit('login',10);$input=jsonInput();$password=$input['password']??'';
   if(!is_string($password)||strlen($password)>1024)throw new InvalidArgumentException('비밀번호를 확인해 주세요.');
@@ -78,8 +116,9 @@ try {
   try {
    if($data['post_type']==='photo')[$image,$thumb]=savePhoto($_FILES['photo']??[], $cfg['storage'], $id);
    elseif(isset($_FILES['photo'])&&($_FILES['photo']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_NO_FILE)throw new InvalidArgumentException('글 참여에는 사진을 첨부하지 않습니다.');
-   $s=db()->prepare('INSERT INTO circle_posts(id,request_key,post_type,nickname,caption,pattern_type,location_label,exact_lat,exact_lng,public_lat,public_lng,location_source,image_name,thumb_name,consent_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
-   $s->execute([$id,$requestKey,$data['post_type'],$data['nickname'],$data['caption'],$data['pattern'],$data['location'],$data['lat'],$data['lng'],$data['lat']===null?null:round($data['lat'],3),$data['lng']===null?null:round($data['lng'],3),$data['source'],$image,$thumb,'2026-10-v2']);
+   $s=db()->prepare('INSERT INTO circle_posts(id,request_key,post_type,user_id,nickname,caption,pattern_type,location_label,exact_lat,exact_lng,public_lat,public_lng,location_source,image_name,thumb_name,consent_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+   $owner=!empty($_SESSION['user_id'])&&($_SESSION['user_until']??0)>time()?$_SESSION['user_id']:null;
+   $s->execute([$id,$requestKey,$data['post_type'],$owner,$data['nickname'],$data['caption'],$data['pattern'],$data['location'],$data['lat'],$data['lng'],$data['lat']===null?null:round($data['lat'],3),$data['lng']===null?null:round($data['lng'],3),$data['source'],$image,$thumb,'2026-10-v2']);
   } catch(Throwable $e) {
    // Also covers a partially written image pair, before savePhoto returned.
    foreach([$id.'.jpg',$id.'-thumb.jpg'] as $name){$path=$cfg['storage'].'/'.$name;if(is_file($path))@unlink($path);}
