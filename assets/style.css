@@ -201,6 +201,7 @@ h3{font-size:30px;letter-spacing:-.8px;line-height:1.45}
 .form>p:not(.eyebrow){font-size:14px;color:var(--muted)}
 fieldset{border:0;padding:0;margin:0;min-width:0}
 label{display:block;margin:24px 0 8px;font-size:14px}
+.nickname-help{margin:12px 0 0;line-height:1.7}
 input:not([type=checkbox]):not([type=radio]),textarea,select{width:100%;padding:14px 16px;border:1px solid var(--control-border);background:var(--surface);color:var(--ink);border-radius:var(--radius-input);min-height:48px;transition:border-color .2s,background .2s}
 input::placeholder,textarea::placeholder{color:var(--muted);opacity:1}
 input:disabled,select:disabled{opacity:.55}
