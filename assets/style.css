@@ -91,6 +91,18 @@ h3{font-size:30px;letter-spacing:-.8px;line-height:1.45}
 .collection-orbit i{position:absolute;left:56px;top:30px;font:42px/1 Georgia,serif;color:var(--forest);font-style:normal}
 .collection-line{font-family:var(--font-display);font-size:18px!important;line-height:1.65!important}
 .collection-line .handwritten{font-size:1.55em;color:var(--forest)}
+.field-film{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,420px);align-items:center;gap:32px 72px;padding:var(--space-section) 0 76px;border-bottom:1px solid var(--line)}
+.field-film-copy{max-width:520px}
+.field-film-copy .eyebrow{margin-bottom:18px}
+.field-film-copy h2{font-size:clamp(38px,4.2vw,54px);line-height:1.28;margin-bottom:22px}
+.field-film-copy>p:not(.eyebrow){max-width:35ch;color:var(--stone);font-size:16px;line-height:1.9;margin-bottom:28px}
+.field-film-media{width:min(100%,360px);margin:0 auto}
+.field-film-media video{display:block;width:100%;height:auto;aspect-ratio:9/16;object-fit:contain;background:#151a17;border-radius:16px}
+.field-film-media figcaption{margin-top:10px;color:var(--muted);font-size:11px;letter-spacing:.2px}
+.field-film-summary{grid-column:1/-1;margin:0;border-top:1px solid var(--line);border-bottom:0;padding:12px 0 0}
+.field-film-summary summary{font-size:13px}
+.field-film-summary p{max-width:65ch;color:var(--muted);font-size:13px;line-height:1.8;margin:8px 0 0}
+.field-film+.mission-section{padding-top:72px}
 .mission-section{display:grid;grid-template-columns:1fr 1.55fr;gap:64px;padding:var(--space-section) 0;border-bottom:1px solid var(--line)}
 .section-intro h2{font-size:42px}
 .safety-note{display:block;color:var(--muted);font-size:12px;max-width:270px}
@@ -271,6 +283,7 @@ dialog h2{clear:both;margin-top:20px}
 @media(min-width:801px){.hero-copy,.hero-universe{animation:reveal .7s ease-out both}.hero-universe{animation-delay:.12s}}
 @media(max-width:1023px){
  main{padding-inline:32px}.hero{gap:32px;min-height:580px}.hero h1{font-size:clamp(58px,7.2vw,74px)}.hero-description{font-size:14px}.hero-actions{gap:16px}.hero-universe{align-self:center;aspect-ratio:.9}
+ .field-film{grid-template-columns:minmax(0,1fr) minmax(0,340px);gap:28px}.field-film-media{max-width:320px}
  .mission-section{gap:32px;grid-template-columns:1fr 1.5fr}.mission-card{padding:24px;grid-template-columns:1fr 80px;gap:16px}.mission-art{width:80px}.section-intro h2{font-size:36px}.mission-actions{gap:8px}.mission-actions button,.mission-actions a{padding:12px 16px}
  .archive-tools{grid-template-columns:minmax(0,1fr)}.search-row{max-width:none}.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.live-mode .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
  .collection-strip{grid-template-columns:minmax(0,1fr) 118px minmax(0,1fr);gap:16px}.collection-strip>a{grid-column:3}.collection-orbit{width:118px;height:98px}.collection-orbit span{width:86px;height:86px}.collection-orbit span:nth-child(2){left:32px}.collection-orbit i{left:43px;top:27px}
@@ -281,6 +294,7 @@ dialog h2{clear:both;margin-top:20px}
  main{padding:32px 24px 140px}.hero{grid-template-columns:1fr;gap:40px;padding:12px 0 48px;min-height:0}.hero .eyebrow{font-size:10px;letter-spacing:1px}.hero h1{font-size:clamp(54px,14vw,72px)}.hero-english{font-size:21px;margin-bottom:24px}.hero-description{font-size:15px;margin-bottom:24px}.hero-note{font-size:12px}.hero-actions{gap:16px}.hero-actions .button{padding:14px 22px}.hero-actions .text-link{font-size:13px}
  .hero-universe{width:100%;max-width:480px;margin:0 auto;aspect-ratio:.9}.universe-label{font-size:9px}.art-label{font-size:10px}.coordinate-label{font-size:13px}.pattern-art{border-width:6px}.pattern-art b{font-size:24px}
  .collection-strip{padding:24px;grid-template-columns:1fr 112px;gap:8px 16px}.collection-count{grid-column:1}.collection-orbit{grid-column:2;grid-row:1/3;width:112px}.collection-strip .collection-line{grid-column:1;font-size:16px!important}.collection-strip .eyebrow{font-size:9px;letter-spacing:1px}.collection-strip strong{font-size:42px}.collection-strip p{font-size:13px}.collection-strip>a{grid-column:1/-1;font-size:13px}
+ .field-film{grid-template-columns:minmax(0,1fr);gap:28px;padding-bottom:52px}.field-film-copy h2{font-size:40px}.field-film-copy>p:not(.eyebrow){font-size:14px}.field-film-media{width:min(100%,340px);max-width:none}.field-film-summary{padding-top:8px}.field-film+.mission-section{padding-top:52px}
  .mission-section{grid-template-columns:1fr;gap:32px}.section-intro h2{font-size:36px}.section-intro br{display:none}.section-intro .muted{font-size:14px;margin-bottom:16px}.safety-note{max-width:none;font-size:12px}.mission-card{grid-template-columns:1fr 72px;padding:24px;gap:16px}.mission-art{width:72px}.mission-copy h3{font-size:26px;letter-spacing:-.5px}.mission-copy p:last-child{font-size:14px}.mission-copy .eyebrow{font-size:9px;letter-spacing:1px}.mission-actions{gap:12px}.mission-actions button,.mission-actions a{padding:12px 18px;font-size:13px;flex:1 1 100%;gap:8px}
  .controls{gap:16px;flex-wrap:wrap;margin-bottom:32px}.controls h2{font-size:32px}.controls .eyebrow{font-size:9px;letter-spacing:1px}.controls>.text-link{font-size:13px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:32px 16px}.photo-tag{font-size:10px;bottom:8px;right:8px}.card p{font-size:13px;margin-top:12px}.card .muted{font-size:11px}.photo-mat,.text-art{border-radius:16px}.text-art{padding:18px;min-height:200px}.text-art .eyebrow{font-size:8px;letter-spacing:.3px;margin-bottom:12px}.card-caption{font-size:15px;line-height:1.85;-webkit-line-clamp:4}.note-mark{font-size:18px;right:12px;bottom:4px}.surprise-button{font-size:13px}.surprise-help{font-size:11px}
  .join-section{padding:48px 24px}.join-section h2{font-size:36px}.join-circle{font-size:300px;left:-60%;top:5%}.join-section .eyebrow{font-size:9px;letter-spacing:1px}.join-section .button{font-size:13px;padding-inline:18px}.join-section p:last-child{font-size:12px}.project-footer{flex-direction:column;gap:8px;font-size:10px}
