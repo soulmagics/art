@@ -129,9 +129,9 @@ function collectionEdit(item,refresh){
  };
 }
 function cards(items,adminMode=false){
- return items.map(p=>'<article class="card '+(isPhoto(p)?'photo-card':'text-card')+'"><button class="card-open secondary" data-detail="'+p.id+'" aria-label="'+esc(isPhoto(p)?p.location_label+' 사진 보기':p.nickname+'님의 글 보기')+'">'+
+ return items.map(p=>'<article class="card '+(isPhoto(p)?'photo-card':'text-card')+'"><button class="card-open secondary" data-detail="'+p.id+'" aria-label="'+esc(isPhoto(p)?(p.location_label||'발견한 동그라미')+' 사진 보기':p.nickname+'님의 글 보기')+'">'+
   (isPhoto(p)?'<span class="photo-mat"><img src="'+img(p)+'" alt="'+esc(p.caption||'참여자가 발견한 동그란 것')+'" loading="lazy">'+(p.pattern_type&&p.pattern_type!=='Other'?'<span class="photo-tag">'+esc(patternLabel(p.pattern_type))+'</span>':'')+'</span>':'<span class="text-art"><span class="eyebrow">FIELD NOTE · 도시의 이야기</span><span class="card-caption">'+esc(p.caption)+'</span><span class="note-mark" aria-hidden="true">↗</span></span>')+'</button><p>'+
-  (isPhoto(p)?'<strong>'+esc(p.location_label)+'</strong><br>':'')+'<span class="muted">'+esc(p.nickname)+(isPhoto(p)?(p.pattern_type&&p.pattern_type!=='Other'?' · '+esc(patternLabel(p.pattern_type)):''):' · 글')+'</span></p>'+
+  (isPhoto(p)?'<strong>'+esc(p.location_label||'발견한 동그라미')+'</strong><br>':'')+'<span class="muted">'+esc(p.nickname)+(isPhoto(p)?(p.pattern_type&&p.pattern_type!=='Other'?' · '+esc(patternLabel(p.pattern_type)):''):' · 글')+'</span></p>'+
   (adminMode?'<p class="muted">공개 동의 · '+esc(p.consent_version)+'</p>':'')+'</article>').join('')||
   '<p class="empty">'+(adminMode?'이 상태의 기록이 없습니다.':'아직 공개된 기록이 없습니다. 첫 발견을 함께 나눠 주세요.')+'</p>';
 }
@@ -140,9 +140,9 @@ function detail(p){
  if(!p)return;const dialog=document.createElement('dialog');
  dialog.innerHTML='<button class="secondary" data-close>닫기</button>'+
   (isPhoto(p)?'<img src="'+img(p,false)+'" alt="'+esc(p.caption||'참여자가 발견한 동그란 것')+'">':'')+
-  '<h2>'+esc(isPhoto(p)?p.location_label:'도시에 남긴 이야기')+'</h2><p class="record-caption">'+esc(p.caption)+'</p><p class="muted">'+esc(p.nickname)+(isPhoto(p)&&p.pattern_type&&p.pattern_type!=='Other'?' · '+esc(patternLabel(p.pattern_type)):'')+'</p>'+
-  (isPhoto(p)&&(!p.status||p.status==='approved')?'<a class="button" href="'+base+'/map/?lat='+encodeURIComponent(p.public_lat)+'&lng='+encodeURIComponent(p.public_lng)+'">지도에서 보기</a>':'');
- document.body.append(dialog);dialog.setAttribute('aria-label',isPhoto(p)?p.location_label:'도시에 남긴 이야기');dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
+  '<h2>'+esc(isPhoto(p)?(p.location_label||'발견한 동그라미'):'도시에 남긴 이야기')+'</h2><p class="record-caption">'+esc(p.caption)+'</p><p class="muted">'+esc(p.nickname)+(isPhoto(p)&&p.pattern_type&&p.pattern_type!=='Other'?' · '+esc(patternLabel(p.pattern_type)):'')+'</p>'+
+  (isPhoto(p)&&p.public_lat!=null&&p.public_lng!=null&&(!p.status||p.status==='approved')?'<a class="button" href="'+base+'/?view=map&focus='+encodeURIComponent('post:'+p.id)+'#gallery">지도에서 보기</a>':'');
+ document.body.append(dialog);dialog.setAttribute('aria-label',isPhoto(p)?(p.location_label||'발견한 동그라미'):'도시에 남긴 이야기');dialog.querySelector('[data-close]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
 }
 function collectionMarkup(){
  if(!collection.length)return '';
@@ -226,6 +226,7 @@ function createMap(id,click){
  if(click)instance.on('click',e=>click(e.latlng.lat,e.latlng.lng));return instance;
 }
 function setCoords(lat,lng,via){
+ if($('share-location')&&(!$('share-location').checked||$('photo-fields').disabled))return;
  coords=[Number(lat),Number(lng)];source=via;
  $('lat').value=coords[0].toFixed(6);$('lng').value=coords[1].toFixed(6);$('confirmed').checked=false;
  if(map){markers.clearLayers();L.marker(coords).addTo(markers);map.setView(coords,16);}
@@ -250,23 +251,30 @@ function upload(){
  '<div class="entry-steps" aria-label="참여 순서"><span><b>01</b> 기록하기</span><span><b>02</b> 관리자 확인</span><span><b>03</b> 함께 보기</span></div>'+
  '<form id="upload-form"><fieldset id="entry-fields"><legend class="sr-only">참여 내용</legend>'+
  '<fieldset class="mode-picker"><legend>참여 방법</legend><label><input type="radio" name="post_type" value="photo" checked>사진 올리기</label><label><input type="radio" name="post_type" value="text">글 남기기</label></fieldset>'+
- '<fieldset id="photo-fields"><legend class="sr-only">사진과 발견 장소</legend><label for="subject-type">어떤 동그라미인가요?</label><select id="subject-type" required><option value="" selected disabled>종류를 골라주세요</option><option value="manhole">맨홀</option><option value="round">다른 동그라미</option></select><label for="photo">직접 찍은 동그란 것의 사진</label><input id="photo" type="file" accept="image/*" required><p class="muted">직접 찍은 사진을 골라주세요. 최대 30MB.</p><details class="photo-help"><summary>사진과 위치 정보 안내</summary><p>사진은 전송 전에 압축하며 공개 사진의 GPS 메타데이터는 제거합니다. 지도에는 대략적인 위치를 표시하지만 사진이나 장소 이름으로 촬영지를 알 수 있어요. 공개해도 괜찮은 장소인지 확인해 주세요.</p></details><img id="preview" class="preview" alt="선택한 사진 미리보기" hidden>'+
- '<h2>발견 장소 확인</h2><p id="location-state" class="muted">사진 위치를 확인하거나 지도에서 장소를 선택해 주세요.</p><button type="button" id="gps" class="secondary">현재 위치 사용</button>'+
+ '<fieldset id="photo-fields"><legend class="sr-only">사진과 발견 장소</legend><label for="subject-type">어떤 동그라미인가요?</label><select id="subject-type" required><option value="" selected disabled>종류를 골라주세요</option><option value="manhole">맨홀</option><option value="round">다른 동그라미</option></select><label for="photo">직접 찍은 동그란 것의 사진</label><input id="photo" type="file" accept="image/*" required><p class="muted">직접 찍은 사진을 골라주세요. 최대 30MB.</p><details class="photo-help"><summary>사진과 위치 정보 안내</summary><p>사진은 전송 전에 압축하고 GPS 메타데이터를 제거합니다. 위치는 자동으로 읽지 않습니다. 장소 공개를 선택한 경우에도 사진 속 배경이나 장소 이름으로 촬영지를 알 수 있으니 확인해 주세요.</p></details><img id="preview" class="preview" alt="선택한 사진 미리보기" hidden>'+
+ '<label class="location-choice"><input id="share-location" type="checkbox">장소도 함께 공개할게요 · 선택</label><p class="muted">위치 없이 사진만 올려도 괜찮아요. 선택하지 않으면 장소나 좌표를 저장하지 않고, 갤러리에만 전시합니다.</p><fieldset id="location-fields" hidden disabled><legend>공개할 장소</legend><h2>발견 장소 확인</h2><p id="location-state" class="muted">공개해도 괜찮은 장소만 선택해 주세요.</p><button type="button" id="read-photo-gps" class="secondary">사진에서 위치 가져오기</button><button type="button" id="gps" class="secondary">현재 위치 사용</button>'+
  (kakaoKey?'<div class="row"><input id="search" placeholder="장소명·주소 검색" aria-label="장소 검색"><button type="button" id="search-button" class="secondary">검색</button></div><div id="results" class="row"></div>':'')+
  '<div id="upload-map" class="map"></div><details id="coordinate-details"><summary>좌표 직접 입력 / 지도 이용 불가 시</summary><label for="lat">위도</label><input id="lat" type="number" step="any" min="-90" max="90" required><label for="lng">경도</label><input id="lng" type="number" step="any" min="-180" max="180" required><button type="button" id="apply-coords" class="secondary">좌표 적용</button></details>'+
- '<label for="location">발견 장소 이름</label><input id="location" maxlength="150" placeholder="예: 서울 성동구 성수동" required><p class="muted">상세 집 주소 등 개인을 특정할 수 있는 장소는 적지 마세요. 지도에는 대략적인 위치를 표시합니다.</p><label><input id="confirmed" type="checkbox" required>사진을 찍은 장소가 맞습니다.</label>'+
+ '<label for="location">발견 장소 이름</label><input id="location" maxlength="150" placeholder="예: 서울 성동구 성수동" required><p class="muted">상세 집 주소 등 개인을 특정할 수 있는 장소는 적지 마세요. 지도에는 대략적인 위치를 표시합니다.</p><label><input id="confirmed" type="checkbox" required>이 장소가 맞으며, 장소 이름과 대략적인 위치를 지도에 공개합니다.</label></fieldset>'+
  '<details class="photo-help"><summary>무늬 분류 · 선택</summary><label for="pattern">무늬가 있다면 골라주세요</label><select id="pattern">'+Object.entries(patterns).map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('')+'</select></details></fieldset>'+
  '<label for="nickname">이름 또는 Threads 아이디 · 선택</label><input id="nickname" maxlength="60" placeholder="예: @yourhandle" aria-describedby="nickname-help"><p id="nickname-help" class="muted nickname-help">사진과 글에 함께 표시할 이름이에요. 비우면 ‘도시 관찰자’로 표시됩니다. Threads 계정과 자동 연결되지는 않아요.</p><label id="caption-label" for="caption">사진에 덧붙일 말 · 선택</label><textarea id="caption" maxlength="500" placeholder="'+esc(mission?.hint||'어떤 동그란 것을 발견했나요? 그날의 이야기를 적어주세요.')+'" aria-describedby="caption-count"></textarea><p id="caption-count" class="character-count">0 / 500</p>'+
  '<label><input id="consent" type="checkbox" required><span id="consent-label"></span></label><p class="muted">사람의 얼굴·차량 번호·개인정보가 포함되지 않도록 확인해 주세요. 삭제 요청: Instagram @cloud.visualizer</p>'+
  '<button id="submit" type="submit">기록 남기기</button></fieldset><p id="progress" role="status"></p></form></div>';
  let mode='photo',photoRevision=0,submitting=false;
  $('pattern').value='Other';
- const consentPhoto='직접 촬영한 사진이며, 사진·이름·글·대략적인 장소가 온라인 아카이브와 전시장 화면에 공개되는 데 동의합니다.';
+ const consentPhoto='직접 촬영한 사진이며, 사진·이름·글이 온라인 갤러리와 전시장 화면에 공개되는 데 동의합니다.';
  const consentText='작성한 이름과 글이 온라인 아카이브와 전시장 화면에 공개되는 데 동의합니다.';
  $('consent-label').textContent=consentPhoto;
- map=createMap('upload-map',(lat,lng)=>{if(!submitting)setCoords(lat,lng,'pin');});if(map)markers=L.layerGroup().addTo(map);else $('coordinate-details').open=true;
+ const sharesLocation=()=>mode==='photo'&&$('share-location').checked;
+ const clearLocation=()=>{photoRevision++;coords=null;$('lat').value='';$('lng').value='';$('location').value='';$('confirmed').checked=false;if(markers)markers.clearLayers();};
+ $('share-location').onchange=()=>{
+  clearLocation();const share=sharesLocation();$('location-fields').hidden=!share;$('location-fields').disabled=!share;
+  if(share){if(!map){map=createMap('upload-map',(lat,lng)=>{if(!submitting&&sharesLocation())setCoords(lat,lng,'pin');});if(map)markers=L.layerGroup().addTo(map);else $('coordinate-details').open=true;}if(map)map.invalidateSize();}
+  else if(map){map.remove();map=null;markers=null;}
+  $('location-state').textContent='공개해도 괜찮은 장소만 선택해 주세요.';
+ };
  app.querySelectorAll('[name=post_type]').forEach(radio=>radio.onchange=()=>{
-  mode=radio.value;$('photo-fields').hidden=mode==='text';$('photo-fields').disabled=mode==='text';$('caption').required=mode==='text';
+  mode=radio.value;if(mode==='text'){$('share-location').checked=false;$('share-location').onchange();}$('photo-fields').hidden=mode==='text';$('photo-fields').disabled=mode==='text';$('caption').required=mode==='text';
   $('caption-label').textContent=mode==='text'?'남길 글 · 1~500자':'사진에 덧붙일 말 · 선택';
   $('caption').placeholder=mission?.type===mode?mission.hint:mode==='text'?'전시를 보며 떠오른 생각이나 걷다가 본 풍경을 적어주세요.':'어떤 동그란 것을 발견했나요? 그날의 이야기를 적어주세요.';
   $('consent-label').textContent=mode==='text'?consentText:consentPhoto;$('consent').checked=false;
@@ -274,20 +282,27 @@ function upload(){
  });
  if(mission){if(mission.pattern)$('pattern').value=mission.pattern;const radio=app.querySelector('[name=post_type][value="'+mission.type+'"]');radio.checked=true;radio.onchange();}
  $('caption').oninput=()=>{$('caption-count').textContent=Array.from($('caption').value).length+' / 500';};
- $('photo').onchange=async e=>{
-  const revision=++photoRevision;selectedPhoto=e.target.files[0]||null;coords=null;
-  $('lat').value='';$('lng').value='';$('confirmed').checked=false;if(markers)markers.clearLayers();
-  if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}$('preview').hidden=true;$('location-state').textContent='사진의 발견 장소를 선택해 주세요.';
+ $('photo').onchange=e=>{
+  clearLocation();selectedPhoto=e.target.files[0]||null;
+  if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}$('preview').hidden=true;
+  $('location-state').textContent='공개할 장소를 선택해 주세요. 위치 없이도 올릴 수 있어요.';
   if(!selectedPhoto)return;
   previewUrl=URL.createObjectURL(selectedPhoto);$('preview').src=previewUrl;$('preview').hidden=false;
-  try{const gps=window.exifr?await exifr.gps(selectedPhoto):null;if(revision!==photoRevision||submitting)return;
-   if(gps&&Number.isFinite(gps.latitude)&&Number.isFinite(gps.longitude)){setCoords(gps.latitude,gps.longitude,'exif');notice('사진에서 위치를 찾았습니다.');}
-   else notice('사진에 위치 정보가 없습니다. 발견한 장소를 선택해 주세요.');
-  }catch{if(revision===photoRevision)notice('사진 위치를 읽지 못했습니다. 지도에서 선택해 주세요.');}
+ };
+ $('read-photo-gps').onclick=async()=>{
+  if(!sharesLocation()||submitting)return;
+  if(!selectedPhoto)return notice('사진을 먼저 골라주세요.');
+  const revision=++photoRevision;
+  try{const gps=window.exifr?await exifr.gps(selectedPhoto):null;if(revision!==photoRevision||submitting||!sharesLocation())return;
+   if(gps&&Number.isFinite(gps.latitude)&&Number.isFinite(gps.longitude)){setCoords(gps.latitude,gps.longitude,'exif');notice('사진의 위치를 찾았어요. 공개할 장소인지 확인해 주세요.');}
+   else notice('사진에 위치가 없어요. 직접 선택하거나 위치 없이 올릴 수 있어요.');
+  }catch{if(revision===photoRevision&&sharesLocation())notice('위치를 읽지 못했어요. 위치 없이도 올릴 수 있어요.');}
  };
  $('gps').onclick=()=>{
+  if(!sharesLocation()||submitting)return;
   if(!navigator.geolocation)return notice('현재 위치를 사용할 수 없습니다.');
-  navigator.geolocation.getCurrentPosition(p=>{if(!submitting)setCoords(p.coords.latitude,p.coords.longitude,'device');},()=>notice('위치 권한 또는 GPS를 확인해 주세요. 지도에서도 선택할 수 있습니다.'),{timeout:10000,enableHighAccuracy:true});
+  const revision=++photoRevision;
+  navigator.geolocation.getCurrentPosition(p=>{if(!submitting&&sharesLocation()&&revision===photoRevision)setCoords(p.coords.latitude,p.coords.longitude,'device');},()=>{if(sharesLocation()&&revision===photoRevision)notice('위치를 가져오지 못했어요. 직접 선택하거나 위치 없이 올릴 수 있어요.');},{timeout:10000,enableHighAccuracy:true});
  };
  if(kakaoKey)$('search-button').onclick=()=>searchPlace().catch(error);
  ['lat','lng','location'].forEach(id=>$(id).oninput=()=>{$('confirmed').checked=false;if(id!=='location')coords=null;});
@@ -299,11 +314,12 @@ function upload(){
  $('upload-form').addEventListener('invalid',e=>{if(e.target.id==='lat'||e.target.id==='lng')$('coordinate-details').open=true;},true);
  $('upload-form').onsubmit=async e=>{
   e.preventDefault();if(submitting)return;
-  if(mode==='photo'&&(!coords||!selectedPhoto))return notice('사진과 위치를 확인해 주세요. 좌표를 입력했다면 좌표 적용을 눌러 주세요.');
+  if(mode==='photo'&&!selectedPhoto)return notice('사진을 골라주세요.');
+  if(sharesLocation()&&!coords)return notice('공개할 위치를 확인하거나 장소 공개 선택을 꺼 주세요.');
   if(mode==='text'&&!$('caption').value.trim())return notice('이야기를 한 글자 이상 남겨 주세요.');
   const fd=new FormData();fd.append('post_type',mode);fd.append('request_key',uploadKey);
   fd.append('nickname',$('nickname').value);fd.append('caption',$('caption').value);fd.append('consent',$('consent').checked?'yes':'no');
-  if(mode==='photo'){for(const id of ['location','pattern'])fd.append(id,$(id).value);fd.append('subject_type',$('subject-type').value);fd.append('lat',coords[0]);fd.append('lng',coords[1]);fd.append('source',source);fd.append('confirmed',$('confirmed').checked?'yes':'no');}
+  if(mode==='photo'){fd.append('pattern',$('pattern').value);fd.append('subject_type',$('subject-type').value);fd.append('share_location',sharesLocation()?'yes':'no');if(sharesLocation()){fd.append('location',$('location').value);fd.append('lat',coords[0]);fd.append('lng',coords[1]);fd.append('source',source);fd.append('confirmed',$('confirmed').checked?'yes':'no');}}
   submitting=true;$('entry-fields').disabled=true;
   try{
    $('progress').textContent=mode==='photo'?'사진을 준비하고 있습니다…':'기록을 보내고 있습니다…';

@@ -164,7 +164,7 @@ try {
    elseif(isset($_FILES['photo'])&&($_FILES['photo']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_NO_FILE)throw new InvalidArgumentException('글 참여에는 사진을 첨부하지 않습니다.');
    $s=db()->prepare('INSERT INTO circle_posts(id,request_key,post_type,user_id,nickname,caption,pattern_type,location_label,exact_lat,exact_lng,public_lat,public_lng,location_source,image_name,thumb_name,consent_version,subject_type,artist_credit) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
    $owner=!empty($_SESSION['user_id'])&&($_SESSION['user_until']??0)>time()?$_SESSION['user_id']:null;
-   $s->execute([$id,$requestKey,$data['post_type'],$owner,$data['nickname'],$data['caption'],$data['pattern'],$data['location'],$data['lat'],$data['lng'],$data['lat']===null?null:round($data['lat'],3),$data['lng']===null?null:round($data['lng'],3),$data['source'],$image,$thumb,'2026-10-v2',$data['subject_type'],artistAccount($owner)?1:0]);
+   $s->execute([$id,$requestKey,$data['post_type'],$owner,$data['nickname'],$data['caption'],$data['pattern'],$data['location'],$data['lat'],$data['lng'],$data['lat']===null?null:round($data['lat'],3),$data['lng']===null?null:round($data['lng'],3),$data['source'],$image,$thumb,$data['post_type']==='photo'?'2026-10-v3':'2026-10-v2',$data['subject_type'],artistAccount($owner)?1:0]);
   } catch(Throwable $e) {
    // Also covers a partially written image pair, before savePhoto returned.
    foreach([$id.'.jpg',$id.'-thumb.jpg'] as $name){$path=$cfg['storage'].'/'.$name;if(is_file($path))@unlink($path);}

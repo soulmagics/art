@@ -14,9 +14,13 @@ function validateUpload(array $p): array {
  $subject=$type==='text'?null:subjectType($p['subject_type']??'unknown');
  $common=['post_type'=>$type,'subject_type'=>$subject,'nickname'=>textField($p,'nickname',60)?:'도시 관찰자','caption'=>textField($p,'caption',500,$type==='text')];
  if($type==='text')return $common+['location'=>null,'lat'=>null,'lng'=>null,'pattern'=>null,'source'=>null];
- if(($p['confirmed']??'')!=='yes') throw new InvalidArgumentException('발견 장소 확인이 필요합니다.');
- $pattern=$p['pattern']??'Other';$source=$p['source']??'pin';
- if(!in_array($pattern,['Geometric','Traditional','Symbol','Letter','Nature','Other'],true)||!in_array($source,['exif','device','search','pin'],true)) throw new InvalidArgumentException('분류 또는 위치를 확인해 주세요.');
+ $pattern=$p['pattern']??'Other';$share=$p['share_location']??'no';
+ if(!in_array($pattern,['Geometric','Traditional','Symbol','Letter','Nature','Other'],true)||!in_array($share,['yes','no'],true))throw new InvalidArgumentException('분류 또는 위치 공개 선택을 확인해 주세요.');
+ // Omission is an opt-out. Ignore even stale client location fields; never retain them privately.
+ if($share!=='yes')return $common+['location'=>null,'lat'=>null,'lng'=>null,'pattern'=>$pattern,'source'=>null];
+ if(($p['confirmed']??'')!=='yes')throw new InvalidArgumentException('장소를 공개하려면 촬영 위치를 확인해 주세요.');
+ $source=$p['source']??'pin';
+ if(!in_array($source,['exif','device','search','pin'],true))throw new InvalidArgumentException('위치를 확인해 주세요.');
  return $common+['location'=>textField($p,'location',150,true),'lat'=>coordinate($p['lat']??null,-90,90),'lng'=>coordinate($p['lng']??null,-180,180),'pattern'=>$pattern,'source'=>$source];
 }
 function subjectType(mixed $value): ?string {

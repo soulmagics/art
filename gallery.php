@@ -24,7 +24,7 @@ function galleryResult(array $query): array {
   $text("CASE WHEN p.post_type='text' THEN 'text' ELSE COALESCE(p.subject_type,'unknown') END",'subject'),
   $text("CASE WHEN $credit THEN 'rami' ELSE 'participants' END",'creator'),
   $text("CASE WHEN $credit THEN '라미' ELSE p.nickname END",'author'),
-  $text("CASE WHEN p.post_type='photo' THEN p.location_label ELSE '남긴 글' END",'title'),
+  $text("CASE WHEN p.post_type='photo' THEN COALESCE(NULLIF(p.location_label,''),'발견한 동그라미') ELSE '남긴 글' END",'title'),
   $text('p.caption','caption'),$text('p.location_label','location_label')]).",p.public_lat,p.public_lng,
  CONVERT('' USING utf8mb4) COLLATE utf8mb4_unicode_ci AS src,0 AS sort_group,p.approved_at AS sort_time
  FROM circle_posts p LEFT JOIN circle_users u ON p.user_id=u.id WHERE p.status='approved'";
