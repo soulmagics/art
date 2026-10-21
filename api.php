@@ -5,6 +5,7 @@ require __DIR__.'/validation.php';
 require __DIR__.'/images.php';
 require __DIR__.'/google-auth.php';
 require __DIR__.'/collection.php';
+require __DIR__.'/gallery.php';
 function jsonInput(): array {
  $input=json_decode(file_get_contents('php://input'),true);
  if(!is_array($input))throw new InvalidArgumentException('요청 내용을 확인해 주세요.');
@@ -13,6 +14,7 @@ function jsonInput(): array {
 try {
  $action = $_GET['action'] ?? 'list';
  if ($_SERVER['REQUEST_METHOD']==='GET') {
+  if ($action==='gallery') out(galleryResult($_GET));
   if ($action==='session') {
    $_SESSION['google_nonce'] ??= bin2hex(random_bytes(24));
    $user=null;
@@ -35,7 +37,7 @@ try {
    admin();$status=$action==='pending'?'pending':($_GET['status']??'pending');
    if(!in_array($status,['pending','approved','hidden','rejected'],true))throw new InvalidArgumentException('관리 상태를 확인해 주세요.');
    $page=max(1,min(10000,(int)($_GET['page']??1)));$offset=($page-1)*60;
-   $s=db()->prepare("SELECT id,post_type,nickname,caption,location_label,pattern_type,public_lat,public_lng,status,consent_version,created_at FROM circle_posts WHERE status=? ORDER BY created_at ASC,id ASC LIMIT 60 OFFSET $offset");$s->execute([$status]);
+   $s=db()->prepare("SELECT id,post_type,nickname,caption,subject_type,location_label,pattern_type,public_lat,public_lng,status,consent_version,created_at FROM circle_posts WHERE status=? ORDER BY created_at ASC,id ASC LIMIT 60 OFFSET $offset");$s->execute([$status]);
    $count=db()->prepare('SELECT COUNT(*) FROM circle_posts WHERE status=?');$count->execute([$status]);
    out(['posts'=>$s->fetchAll(),'total'=>(int)$count->fetchColumn(),'page'=>$page]);
   }
@@ -43,7 +45,7 @@ try {
   if ($action==='mine') {
    if(empty($_SESSION['user_id'])||($_SESSION['user_until']??0)<=time())out(['error'=>'로그인이 필요합니다.'],401);
    $page=max(1,min(10000,(int)($_GET['page']??1)));$offset=($page-1)*60;
-   $s=db()->prepare("SELECT id,post_type,nickname,caption,pattern_type,location_label,public_lat,public_lng,status,created_at,approved_at FROM circle_posts WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 60 OFFSET $offset");$s->execute([$_SESSION['user_id']]);
+   $s=db()->prepare("SELECT id,post_type,nickname,caption,subject_type,pattern_type,location_label,public_lat,public_lng,status,created_at,approved_at FROM circle_posts WHERE user_id=? ORDER BY created_at DESC,id DESC LIMIT 60 OFFSET $offset");$s->execute([$_SESSION['user_id']]);
    $count=db()->prepare('SELECT COUNT(*) FROM circle_posts WHERE user_id=?');$count->execute([$_SESSION['user_id']]);
    out(['posts'=>$s->fetchAll(),'total'=>(int)$count->fetchColumn(),'page'=>$page]);
   }
@@ -60,7 +62,7 @@ try {
     if($south>$north || $west>$east) throw new InvalidArgumentException('지도 범위를 다시 선택해 주세요.');
     $where.=" AND post_type='photo' AND public_lat BETWEEN ? AND ? AND public_lng BETWEEN ? AND ?";$params=array_merge($params,[$south,$north,$west,$east]);$take=200;$offset=0;
    }
-   $s=db()->prepare("SELECT id,post_type,nickname,caption,pattern_type,location_label,public_lat,public_lng,created_at,approved_at FROM circle_posts WHERE $where ORDER BY approved_at DESC,id DESC LIMIT $take OFFSET $offset");$s->execute($params);
+   $s=db()->prepare("SELECT id,post_type,nickname,caption,subject_type,pattern_type,location_label,public_lat,public_lng,created_at,approved_at FROM circle_posts WHERE $where ORDER BY approved_at DESC,id DESC LIMIT $take OFFSET $offset");$s->execute($params);
    $count=db()->prepare("SELECT COUNT(*) FROM circle_posts WHERE $where");$count->execute($params);out(['posts'=>$s->fetchAll(),'total'=>(int)$count->fetchColumn(),'page'=>$page]);
   }
   out(['error'=>'잘못된 요청입니다.'],404);
@@ -119,12 +121,13 @@ try {
   $nickname=textField($input,'nickname',60)?:'도시 관찰자';$caption=textField($input,'caption',500);
   $pdo=db();$pdo->beginTransaction();
   try{
-   $s=$pdo->prepare('SELECT post_type,user_id,nickname,caption,status FROM circle_posts WHERE id=? FOR UPDATE');$s->execute([$id]);$row=$s->fetch();
+   $s=$pdo->prepare('SELECT post_type,user_id,nickname,caption,subject_type,status FROM circle_posts WHERE id=? FOR UPDATE');$s->execute([$id]);$row=$s->fetch();
    $isAdmin=!empty($_SESSION['admin'])&&($_SESSION['admin_until']??0)>time();
    if(!$row||(!$isAdmin&&($row['user_id']===null||$row['user_id']!==($_SESSION['user_id']??null)))){$pdo->rollBack();out(['error'=>'기록을 찾을 수 없습니다.'],404);}
    if($row['post_type']==='text'&&$caption===''){$pdo->rollBack();throw new InvalidArgumentException('글 내용을 입력해 주세요.');}
-   $changed=$row['nickname']!==$nickname||$row['caption']!==$caption;
-   if($changed){$s=$pdo->prepare('UPDATE circle_posts SET nickname=?,caption=?,status=?,approved_at=NULL WHERE id=?');$s->execute([$nickname,$caption,'pending',$id]);}
+   $subject=$row['post_type']==='photo'&&array_key_exists('subject_type',$input)?subjectType($input['subject_type']):$row['subject_type'];
+   $changed=$row['nickname']!==$nickname||$row['caption']!==$caption||$row['subject_type']!==$subject;
+   if($changed){$s=$pdo->prepare('UPDATE circle_posts SET nickname=?,caption=?,subject_type=?,status=?,approved_at=NULL WHERE id=?');$s->execute([$nickname,$caption,$subject,'pending',$id]);}
    $pdo->commit();out(['ok'=>true,'changed'=>$changed,'status'=>$changed?'pending':$row['status']]);
   }catch(Throwable $e){if($pdo->inTransaction())$pdo->rollBack();throw $e;}
  }
@@ -159,9 +162,9 @@ try {
   try {
    if($data['post_type']==='photo')[$image,$thumb]=savePhoto($_FILES['photo']??[], $cfg['storage'], $id);
    elseif(isset($_FILES['photo'])&&($_FILES['photo']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_NO_FILE)throw new InvalidArgumentException('글 참여에는 사진을 첨부하지 않습니다.');
-   $s=db()->prepare('INSERT INTO circle_posts(id,request_key,post_type,user_id,nickname,caption,pattern_type,location_label,exact_lat,exact_lng,public_lat,public_lng,location_source,image_name,thumb_name,consent_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+   $s=db()->prepare('INSERT INTO circle_posts(id,request_key,post_type,user_id,nickname,caption,pattern_type,location_label,exact_lat,exact_lng,public_lat,public_lng,location_source,image_name,thumb_name,consent_version,subject_type,artist_credit) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
    $owner=!empty($_SESSION['user_id'])&&($_SESSION['user_until']??0)>time()?$_SESSION['user_id']:null;
-   $s->execute([$id,$requestKey,$data['post_type'],$owner,$data['nickname'],$data['caption'],$data['pattern'],$data['location'],$data['lat'],$data['lng'],$data['lat']===null?null:round($data['lat'],3),$data['lng']===null?null:round($data['lng'],3),$data['source'],$image,$thumb,'2026-10-v2']);
+   $s->execute([$id,$requestKey,$data['post_type'],$owner,$data['nickname'],$data['caption'],$data['pattern'],$data['location'],$data['lat'],$data['lng'],$data['lat']===null?null:round($data['lat'],3),$data['lng']===null?null:round($data['lng'],3),$data['source'],$image,$thumb,'2026-10-v2',$data['subject_type'],artistAccount($owner)?1:0]);
   } catch(Throwable $e) {
    // Also covers a partially written image pair, before savePhoto returned.
    foreach([$id.'.jpg',$id.'-thumb.jpg'] as $name){$path=$cfg['storage'].'/'.$name;if(is_file($path))@unlink($path);}

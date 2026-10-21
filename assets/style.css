@@ -362,6 +362,36 @@ dialog h2{clear:both;margin-top:20px}
 }
 
 /* Artist text keeps its own voice and a comfortable reading measure. */
+.header-links{display:flex;align-items:center;gap:24px;flex-wrap:wrap;justify-content:flex-end;font-size:13px}
+.header-links a{min-height:44px;display:inline-flex;align-items:center}
+.participate-dock{position:fixed;bottom:max(20px,env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:1000;white-space:nowrap}
+body[data-route=upload] .participate-dock,body[data-route=live] .participate-dock,body[data-route=admin] .participate-dock{display:none}
+.unified-gallery{padding:72px 0;scroll-margin-top:24px;min-height:360px}
+.gallery-heading{display:flex;justify-content:space-between;align-items:center;gap:24px;margin-bottom:24px}
+.gallery-heading h2{margin:0}
+.gallery-toolbar{display:grid;gap:20px;padding:20px 0;border-block:1px solid var(--line)}
+.gallery-toolbar .filter-tabs{flex-wrap:wrap}
+.gallery-search{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.gallery-search select{width:auto;min-width:120px;margin:0}
+.gallery-search input{flex:1;min-width:180px;width:auto;margin:0}
+.gallery-view{display:flex;gap:24px}
+.gallery-view button[aria-pressed=true]{background:transparent;color:var(--ink);border-bottom:3px solid var(--action)}
+.gallery-grid{align-items:start}
+.gallery-card-copy{padding:16px}
+.gallery-card-copy h3{font:500 18px/1.5 var(--font-body);margin:6px 0;overflow-wrap:anywhere}
+.gallery-kind{font-size:12px;color:var(--muted)}
+.gallery-author{min-height:44px;padding:4px 0;background:transparent;color:var(--ink);border:0;border-radius:0;font-size:14px;text-decoration:underline;text-underline-offset:4px}
+.gallery-author:hover:not(:disabled){background:transparent;color:var(--action)}
+.gallery-pagination{justify-content:center;margin-top:32px}
+dialog.gallery-detail{width:min(860px,calc(100vw - 24px));max-height:calc(100dvh - 24px);padding:24px;overflow:hidden}
+dialog.gallery-detail[open]{display:flex;flex-direction:column}
+.gallery-detail-content{min-height:0;overflow:auto}
+.gallery-detail-top,.gallery-detail-nav{display:flex;gap:16px;justify-content:space-between;align-items:center;flex-shrink:0}
+.gallery-detail-top{margin-bottom:16px}.gallery-detail-nav{margin-top:24px}
+dialog.gallery-detail .gallery-detail-image{width:100%;max-height:58dvh;object-fit:contain;background:var(--surface)}
+.gallery-detail-copy{padding:24px 0 0}.gallery-detail-copy h2{margin-top:16px}
+.gallery-detail-copy .record-caption{overflow-wrap:anywhere;white-space:pre-wrap}
+@media(max-width:600px){.header-links{gap:0 14px;font-size:12px;max-width:180px}.header-links .social-link{display:none}.gallery-heading{align-items:flex-start;flex-direction:column}.gallery-heading h2{font-size:32px}.gallery-toolbar .filter-tabs button{flex:0 1 auto;padding:10px 14px}.gallery-search input{flex-basis:100%}.gallery-search label{font-size:13px}.gallery-view{gap:16px}.unified-gallery{padding:48px 0}.gallery-detail-top{gap:8px}.gallery-detail-top button{padding:10px 14px}.gallery-detail-top span{font-size:12px}dialog.gallery-detail{padding:16px}.gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.gallery-card-copy{padding:10px}.gallery-card-copy h3{font-size:15px}.gallery-card .text-art{min-height:200px}.gallery-card .card-caption{font-size:17px}}
 .hero-invitation{font-size:15px;line-height:1.7;margin:24px 0 12px;color:var(--muted)}
 .artist-note{width:min(100%,760px);margin:28px auto 0;text-align:left;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .artist-note summary{min-height:48px;padding:16px 0;cursor:pointer;font-weight:600}
