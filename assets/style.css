@@ -80,7 +80,7 @@ h3{font-size:30px;letter-spacing:-.8px;line-height:1.45}
 .pattern-art.orbit b{background:var(--paper);color:var(--ink);border:1px solid #849e9f;font-size:20px}
 .pattern-art.letters{background:#b0b19c;border-color:#747961}
 .pattern-art.letters::before{content:"도시 · CITY · 도시 · CITY";position:absolute;inset:17%;font:600 16px/2.7 system-ui;text-align:center;border:1px dashed #46513b;border-radius:50%;color:#323e2a;word-spacing:7px}
-.collection-strip{padding:28px 40px;display:grid;grid-template-columns:minmax(0,1.25fr) 150px minmax(0,1fr) auto;align-items:center;gap:24px;background:var(--sage);border-radius:var(--radius)}
+.collection-strip{padding:28px 40px;display:grid;grid-template-columns:minmax(0,1fr) 150px auto;align-items:center;gap:24px;background:var(--sage);border-radius:var(--radius)}
 .collection-strip .eyebrow{margin:0;font-size:10px}
 .collection-strip p{font-size:14px;line-height:1.7;margin:0}
 .collection-strip strong{font:48px/1.3 var(--font-display);margin-right:12px}
@@ -359,3 +359,15 @@ dialog h2{clear:both;margin-top:20px}
  .bento-motion .bento-stage,.bento-motion .hero-copy{position:relative;top:auto;margin-top:0;opacity:1}
  .bento-motion .bento-side{opacity:1}.bento-scroll-hint{display:none!important}
 }
+
+/* Artist text keeps its own voice and a comfortable reading measure. */
+.hero-invitation{font-size:15px;line-height:1.7;margin:24px 0 12px;color:var(--muted)}
+.artist-note{width:min(100%,760px);margin:28px auto 0;text-align:left;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.artist-note summary{min-height:48px;padding:16px 0;cursor:pointer;font-weight:600}
+.artist-note-body{max-width:42em;padding:8px 0 24px;font-size:17px;line-height:1.95;word-break:keep-all;overflow-wrap:anywhere}
+.artist-note-body p{margin:0 0 1.5em}
+.artist-note-body p:last-child{margin-bottom:0}
+.artist-note-body blockquote{margin:0 0 2em;padding:0 0 0 20px;border-left:2px solid var(--line)}
+.photo-help{margin:0 0 20px;font-size:14px;line-height:1.8}
+.photo-help summary{min-height:44px;cursor:pointer;padding:10px 0}
+@media(max-width:600px){.artist-note-body{font-size:16px;line-height:1.9}.artist-note-body blockquote{padding-left:14px}}
